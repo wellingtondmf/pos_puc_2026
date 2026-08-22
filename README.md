@@ -91,6 +91,7 @@ Exemplo:
 
 A melhor chave será o código ISO-3. Quando o ClinicalTrials.gov pode não fornecer esse código, então crio uma tabela de correspondência.
 
+```mermaid
 flowchart TD
     A["ClinicalTrials.gov API"] --> B["Bronze: estudos JSON"]
     C["World Bank API"] --> D["Bronze: população JSON"]
@@ -98,6 +99,7 @@ flowchart TD
     D --> F["Silver: população por país e ano"]
     E --> G["Gold: indicadores analíticos"]
     F --> G
+```
 
 ## Limitações conhecidas:
 * Um estudo pode ocorrer em vários países.
