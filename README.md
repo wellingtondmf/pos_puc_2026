@@ -76,3 +76,33 @@ Fonte complementar para obter a população anual dos países.
 * Autenticação: não necessária.
 * Documentação: World Bank Indicators API
 * Indicador: Population, total
+
+## Conciliação das Origens
+
+Os dados serão unidos por:
+
+|país + ano|
+
+Antes do Join, será necessário padronizar os nomes dos países:
+Exemplo:
+|United States → USA|
+|Brazil → BRA|
+|United Kingdom → GBR|
+
+A melhor chave será o código ISO-3. Quando o ClinicalTrials.gov pode não fornecer esse código, então crio uma tabela de correspondência.
+
+flowchart TD
+    A["ClinicalTrials.gov API"] --> B["Bronze: estudos JSON"]
+    C["World Bank API"] --> D["Bronze: população JSON"]
+    B --> E["Silver: estudos normalizados"]
+    D --> F["Silver: população por país e ano"]
+    E --> G["Gold: indicadores analíticos"]
+    F --> G
+
+## Limitações conhecidas:
+* Um estudo pode ocorrer em vários países.
+* Nem todo estudo possui fase clínica.
+* Estudos observacionais normalmente não possuem fase.
+* A quantidade de participantes pode ser prevista, e não efetivamente realizada.
+* Um estudo registrado não significa tratamento aprovado ou comprovadamente eficaz.
+* Atualizações da API podem alterar os resultados entre diferentes datas de execução.
