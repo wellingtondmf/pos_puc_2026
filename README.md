@@ -1,4 +1,4 @@
-### Escopo
+## Escopo
 
 O MVP analisará somente informações públicas e agregadas sobre estudos clínicos. Não serão utilizados dados pessoais de pacientes nem será realizada recomendação médica.
 
@@ -51,11 +51,11 @@ O MVP permitirá acompanhar a evolução das pesquisas, identificar padrões nos
 * Consultas SQL e visualizações respondendo às perguntas.
 * Documentação completa do MVP.
 
-Etapa 2 — Busca e seleção dos dados
+## Etapa 2 — Busca e seleção dos dados
 
 Fontes públicas e gratuitas.
 
-1. ClinicalTrials.gov
+###1. ClinicalTrials.gov
 
 Fonte principal para os estudos clínicos sobre câncer de mama.
 
