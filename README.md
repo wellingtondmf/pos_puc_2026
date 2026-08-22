@@ -59,9 +59,9 @@ Fontes públicas e gratuitas.
 
 Fonte principal para os estudos clínicos sobre câncer de mama.
 
-Responsável: U.S. National Library of Medicine.
-Formato: JSON.
-Coleta: API REST v2.
-Autenticação: não necessária.
-Documentação: ClinicalTrials.gov API
-Estrutura dos dados: Study Data Structure
+* Responsável: U.S. National Library of Medicine.
+* Formato: JSON.
+* Coleta: API REST v2.
+* Autenticação: não necessária.
+* Documentação: ClinicalTrials.gov API
+* Estrutura dos dados: Study Data Structure
