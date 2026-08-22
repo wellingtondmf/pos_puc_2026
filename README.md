@@ -55,7 +55,7 @@ O MVP permitirá acompanhar a evolução das pesquisas, identificar padrões nos
 
 Fontes públicas e gratuitas.
 
-###1. ClinicalTrials.gov
+### 1. ClinicalTrials.gov
 
 Fonte principal para os estudos clínicos sobre câncer de mama.
 
