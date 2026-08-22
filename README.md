@@ -50,3 +50,18 @@ O MVP permitirá acompanhar a evolução das pesquisas, identificar padrões nos
 * Relatório de qualidade.
 * Consultas SQL e visualizações respondendo às perguntas.
 * Documentação completa do MVP.
+
+Etapa 2 — Busca e seleção dos dados
+
+Fontes públicas e gratuitas.
+
+1. ClinicalTrials.gov
+
+Fonte principal para os estudos clínicos sobre câncer de mama.
+
+Responsável: U.S. National Library of Medicine.
+Formato: JSON.
+Coleta: API REST v2.
+Autenticação: não necessária.
+Documentação: ClinicalTrials.gov API
+Estrutura dos dados: Study Data Structure
