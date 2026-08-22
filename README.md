@@ -65,3 +65,14 @@ Fonte principal para os estudos clínicos sobre câncer de mama.
 * Autenticação: não necessária.
 * Documentação: ClinicalTrials.gov API
 * Estrutura dos dados: Study Data Structure
+
+### 2. World Bank Open Data
+
+Fonte complementar para obter a população anual dos países.
+
+* Indicador: SP.POP.TOTL.
+* Descrição: população total por país e ano.
+* Formato: JSON.
+* Autenticação: não necessária.
+* Documentação: World Bank Indicators API
+* Indicador: Population, total
