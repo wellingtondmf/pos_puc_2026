@@ -3,7 +3,7 @@
 **MVP de Engenharia de Dados — Pós-graduação PUC-Rio**  
 **Autor:** Wellington Freitas  
 **Plataforma prevista no projeto:** Databricks Free Edition  
-**Versão da documentação:** rascunho completo para revisão — 21/09/2026 (UTC)
+**Versão da documentação:** revisão dos 11 notebooks reenviados — 21/09/2026 (UTC)
 
 > **Estado atual: implementação e resultados parciais comprovados; entrega acadêmica em revisão.** Este documento descreve o código publicado e as saídas exportadas do Databricks. Não representa uma nova execução do pipeline nem confirma o estado atual do workspace. As correções propostas ainda precisam ser aplicadas e validadas.
 
@@ -11,11 +11,27 @@
 
 - **COMPROVADO:** há resultado numérico ou evidência de execução nos arquivos recebidos.
 - **IMPLEMENTADO:** há código no repositório; isso não comprova execução de ponta a ponta.
+- **INFORMADO PELO AUTOR:** configuração ou atividade relatada, ainda sem evidência anexada para conferência.
 - **PENDENTE:** falta execução, evidência ou decisão do autor.
 - **CORRIGIR:** foi identificado um defeito ou uma divergência concreta.
 - **INVESTIGAR:** há indício de problema, sem diagnóstico conclusivo dos registros individuais.
 
 O README utiliza os sete títulos exigidos pelo enunciado. O catálogo documenta todas as colunas identificadas nas 20 tabelas do código: duas Bronze, seis Silver, dez Gold e duas de controle. Domínios desejados não equivalem a restrições efetivamente aplicadas no banco.
+
+### Prioridades para a revisão do autor
+
+| Prioridade | Situação atual | Próxima ação | Evidência |
+| --- | --- | --- | --- |
+| Alta | Erros históricos de importação de config na Bronze, condições e Gold | Conferir caminhos e versão usada por cada task; validar uma execução limpa | E08, E11 |
+| Alta | Config lê Bronze durante a inicialização | Separar configuração do processamento para permitir primeira carga | E11 |
+| Alta | Job agendado informado, sem configuração anexada | Preencher nome, agenda, fuso, tasks, dependências e Run ID | E06–E08 |
+| Alta | 2.493 localizações sem ISO3 e regra de status com 32 falsos positivos | Corrigir referência geográfica e domínio; medir novamente | E12, E13 |
+| Alta | Nove perguntas sem resultado final documentado | Executar consultas e escrever resultados e interpretação | Q01–Q03, Q06, Q08–Q12 |
+| Média | 6.890 registros populacionais coletados e 6.760 na Silver | Conciliar metadados, persistência e descarte por filtro | E03 |
+| Média | Volume declarado; escrita de arquivos no volume não demonstrada | Confirmar destino desejado e capturar o armazenamento real | E01 |
+| Média | Datas imputadas/estimadas, agregados geográficos e valores extremos | Definir critérios de elegibilidade antes das análises finais | E13–E15 |
+
+As correções listadas são recomendações de revisão. Este documento não executa nem modifica os notebooks. Para encerrar cada pendência, registrar a mudança aplicada, Run ID, resultado posterior e print correspondente.
 
 ### Navegação
 
@@ -32,17 +48,18 @@ O README utiliza os sete títulos exigidos pelo enunciado. O catálogo documenta
 
 ### Base documental e temporal
 
-| Material | Uso nesta revisão | Limite |
-| --- | --- | --- |
-| [Código do MVP](https://github.com/wellingtondmf/pos_puc_2026/tree/main/MVP_ENGENHARIA_DE_DADOS) | Implementação, nomes, parâmetros e transformações | Notebooks `.ipynb` publicados sem saídas |
-| [Escopo_MVP](https://github.com/wellingtondmf/pos_puc_2026/blob/main/MVP_ENGENHARIA_DE_DADOS/Escopo_MVP) | Objetivo e 12 perguntas originais | Preservados nesta documentação |
-| [README existente na raiz](https://github.com/wellingtondmf/pos_puc_2026/blob/main/README.md) | Contexto, fontes e limitações previamente documentados | A documentação anterior já existe, mas é parcial |
-| `03_etl_gold.dbc`, enviado pelo autor | Contagens, escritas e validações da Gold | Inclui resultados antigos e falha posterior no `config` |
-| `04_qualidade_dados.dbc`, enviado pelo autor | Perfil por coluna, regras e três consultas analíticas | Os resultados refletem a extração analisada, não a fonte ao vivo |
+| Material | Uso nesta revisão |
+| --- | --- |
+| [Código do MVP](https://github.com/wellingtondmf/pos_puc_2026/tree/main/MVP_ENGENHARIA_DE_DADOS) | Implementação, nomes, parâmetros e transformações |
+| [Escopo_MVP](https://github.com/wellingtondmf/pos_puc_2026/blob/main/MVP_ENGENHARIA_DE_DADOS/Escopo_MVP) | Objetivo e 12 perguntas originais |
+| [README existente na raiz](https://github.com/wellingtondmf/pos_puc_2026/blob/main/README.md) | Contexto, fontes e limitações previamente documentados |
+| `01_etl_brz_clinical_trials_table.dbc`| Paginação, persistência Bronze e conciliação da API clínica |
+| `01_etl_brz_world_bank_open_data.dbc` | Coleta e persistência Bronze da população |
+| `02_etl_silver_*.dbc` | Estudos, condições, intervenções, locais, ISO3 e população etc...|
+| `03_etl_gold.dbc` | Contagens, escritas e validações da Gold |
+| `04_qualidade_dados.dbc` | Analise e validação, de regras |
+| `config.dbc` | Constantes, schemas, funções compartilhadas e parsing |
 
-Os campos `collected_at` exibidos no perfil indicam coleta clínica em **22/08/2026 às 17:12:52.889279** e população em **22/08/2026 às 18:41:14.577005**. O código gera esses valores em UTC; confirmar o fuso da sessão usado na exibição. Esses metadados são criados antes das requisições, portanto representam o início lógico da coleta, não o instante de recebimento de cada registro.
-
-Os metadados das células registram contagens Gold e perfil/regras de qualidade em **31/08/2026 (UTC)**. A chamada `%run ./config` na Gold registra falha em **21/09/2026 às 01:40:22 UTC**. As saídas de um notebook podem pertencer a execuções diferentes; não devem ser apresentadas como uma única execução bem-sucedida.
 
 <a id="contexto"></a>
 
@@ -83,7 +100,7 @@ Os objetivos específicos abaixo consolidam o trabalho técnico já definido:
 11. Existe relação entre fase clínica, quantidade de participantes e duração do estudo?
 12. Como a participação do Brasil se compara à de outros países?
 
-**Regra de entrega:** manter todas as perguntas. Quando uma resposta não for obtida, registrar o motivo e a limitação, sem retirar a pergunta do objetivo.
+**Regra de entrega:** Manter todas as perguntas. Quando uma resposta não for obtida, será registrado o motivo e a limitação, sem retirar a pergunta do objetivo.
 
 ### 1.4 Delimitação
 
@@ -97,22 +114,18 @@ Os objetivos específicos abaixo consolidam o trabalho técnico já definido:
 
 ### 1.5 Fontes e condições de uso
 
-| Fonte | Conteúdo utilizado | Acesso | Licença/condições nesta revisão |
+| Fonte | Conteúdo utilizado | Acesso | Licença |
 | --- | --- | --- | --- |
-| ClinicalTrials.gov / National Library of Medicine | Cadastros de estudos, fases, situação, patrocinador, intervenções e locais | API REST v2, JSON | **PENDENTE:** confirmar e registrar integralmente as condições oficiais de reutilização; não atribuir licença CC ou domínio público sem validação |
+| ClinicalTrials.gov / National Library of Medicine | Cadastros de estudos, fases, situação, patrocinador, intervenções e locais | API REST v2, JSON | Dominio Publico |
 | Banco Mundial — World Development Indicators | `SP.POP.TOTL`, população total | Indicators API v2, JSON | A página do indicador informa **CC BY 4.0**, sujeita também aos termos adicionais do Banco Mundial |
 
 Referências verificadas em 21/09/2026:
 
 - [API do ClinicalTrials.gov](https://clinicaltrials.gov/data-api/api).
 - [Estrutura dos dados clínicos](https://clinicaltrials.gov/data-api/about-api/study-data-structure).
-- [Página de termos do ClinicalTrials.gov](https://clinicaltrials.gov/about-site/terms-conditions): o conteúdo das condições não pôde ser confirmado nesta revisão; manter a pendência.
-- [Population, total — SP.POP.TOTL](https://data.worldbank.org/indicator/SP.POP.TOTL): a página informa a licença e os provedores originais.
+- [Página de termos do ClinicalTrials.gov](https://clinicaltrials.gov/about-site/terms-conditions)
+- [Population, total — SP.POP.TOTL](https://data.worldbank.org/indicator/SP.POP.TOTL)
 - [Termos de uso dos datasets do Banco Mundial](https://www.worldbank.org/ext/en/legal/terms-conditions/datasets).
-
-**Atribuição do Banco Mundial:** The World Bank: World Development Indicators — Population, total (SP.POP.TOTL). A página do indicador cita United Nations, órgãos nacionais de estatística e Eurostat entre os provedores. Os dados foram tipados, filtrados e integrados neste MVP. A reutilização deve manter atribuição, indicar alterações e observar os termos adicionais e eventuais condições de terceiros. O projeto não implica endosso do Banco Mundial.
-
-A licença dos dados é distinta da licença do código. **PENDENTE:** o autor deve escolher a licença do repositório, caso deseje conceder direitos de reutilização do código. Não foi identificado arquivo `LICENSE` na árvore consultada.
 
 <a id="carga"></a>
 
@@ -120,7 +133,7 @@ A licença dos dados é distinta da licença do código. **PENDENTE:** o autor d
 
 ### 2.1 Ambiente e destino
 
-| Componente | Implementação observada |
+| Componente | Implementação |
 | --- | --- |
 | Catálogo | `mvp_eng_dados` |
 | Schema | `mvp_cancer` |
@@ -131,7 +144,11 @@ A licença dos dados é distinta da licença do código. **PENDENTE:** o autor d
 | Ingestão | `requests`, sessão HTTP com retentativas |
 | Estratégia de escrita | `overwrite`; várias escritas também usam `overwriteSchema=true` |
 
-O volume é criado no código, mas as rotinas de coleta apresentadas persistem os JSONs na coluna `payload` das tabelas Bronze. **Não há evidência de gravação de arquivos brutos nesse volume.** O payload é uma serialização do objeto JSON de cada registro, não uma cópia byte a byte de toda a resposta HTTP.
+O volume é criado no código, mas as rotinas de coleta apresentadas persistem os JSONs na coluna `payload` das tabelas Bronze.
+
+**EVIDENCIA:**
+
+![image_1789976854301.png](./image_1789976854301.png "image_1789976854301.png")
 
 ### 2.2 Coleta clínica
 
@@ -148,25 +165,28 @@ Endpoint: `https://clinicaltrials.gov/api/v2/studies`.
 
 A coleta acumula os estudos em uma lista Python, adiciona identificador de ingestão, página, URL e instante de coleta, cria um DataFrame com schema explícito e grava `brz_clinical_trials`. Entre páginas há pausa de 0,2 segundo. A sessão HTTP prevê até cinco retentativas, com backoff, para códigos 429, 500, 502, 503 e 504.
 
-O código compara o total persistido com o tamanho da lista e com `totalCount` por meio de `assert`. **IMPLEMENTADO, SEM SAÍDA BRONZE ANEXADA:** os dois arquivos recebidos não apresentam o log original dessas comparações. As 16.736 linhas na Silver/Gold não substituem a prova dessa conciliação.
+O código compara o total persistido com o tamanho da lista e com `totalCount` por meio de `assert`.
 
-Limitações: uso de memória do driver para toda a coleta; ausência de checkpoint por página; ausência de histórico de snapshots por usar `overwrite`; mudanças da fonte durante a paginação podem exigir investigar divergências de contagem. A tabela já é sobrescrita antes dos `assert`, portanto uma divergência não desfaz a gravação automaticamente.
+Limitações: uso de memória do driver para toda a coleta; ausência de histórico de snapshots por usar `overwrite`; mudanças da fonte durante a paginação podem exigir investigar divergências de contagem. 
+
+**EVIDENCIA:**
+
+![image_1789977705671.png](./image_1789977705671.png "image_1789977705671.png")
 
 ### 2.3 Coleta de população
 
 Endpoint: `https://api.worldbank.org/v2/country/all/indicator/SP.POP.TOTL`.
 
-Parâmetros: `format=json`, `date=2000:2025`, `per_page=20000`. O código lê o primeiro elemento da resposta como metadados e o segundo como registros. Grava `brz_population` com JSON individual e metadados de origem.
+Parâmetros: `format=json`, `date=2000:2025`, `per_page=20000`. O código lê o primeiro elemento da resposta como metadados e o segundo como registros. Grava `brz_population` com JSON individual e metadados de origem. a execução exibiu `Registros coletados: 6890`; após filtros e deduplicação, o perfil da `slv_population` contém 6.760 linhas. A diferença não foi conciliada por uma auditoria explícita de perdas.
 
-**CORRIGIR:** `country_id` e `country_iso3` recebem o mesmo campo `countryiso3code`. Se `country_id` pretende representar `country.id` da origem, a atribuição está incorreta. Corrigir ou renomear/documentar como redundância deliberada.
 
-**PENDENTE:** validar `metadata.pages` e `metadata.total` contra a coleta. Não existe loop de paginação dessa fonte no código; `per_page=20000` é uma configuração, não uma prova de completude. O perfil Silver mostra 6.760 linhas, após filtros, e não o total bruto da resposta.
+![image_1789978154353.png](./image_1789978154353.png "image_1789978154353.png")
 
 ### 2.4 Reprocessamento e rastreabilidade
 
-As tabelas são reconstruídas integralmente. A estratégia evita acumular linhas por append, mas não preserva os snapshots anteriores de forma explícita. O código não configura política de retenção ou versionamento de extrações; não se deve prometer reprodução histórica usando apenas o endpoint atual.
+As tabelas são reconstruídas integralmente. A estratégia evita acumular linhas por append, mas não preserva os snapshots anteriores de forma explícita. O código não configura política de retenção ou versionamento de extrações; Pode ser usado o versionamento da tabela delta para talvez uma criação  historica.
 
-`INGESTION_ID` é gerado em cada execução do `config`; não há um identificador único de orquestração compartilhado por todo o pipeline. As tabelas de qualidade são sobrescritas e não armazenam, no modelo atual, uma associação explícita com todos os IDs de ingestão avaliados.
+`INGESTION_ID` é gerado em cada execução do `config`; As tabelas de qualidade são sobrescritas e não armazenam, no modelo atual, uma associação explícita com todos os IDs de ingestão avaliados.
 
 <a id="modelagem"></a>
 
@@ -174,7 +194,7 @@ As tabelas são reconstruídas integralmente. A estratégia evita acumular linha
 
 ### 3.1 Arquitetura e organização
 
-As três camadas estão no mesmo catálogo e schema. A separação é feita pelos prefixos `brz_`, `slv_` e `gld_`; `sys_` identifica resultados de controle. Não existem três catálogos separados nesta implementação.
+As três camadas estão no mesmo catálogo e schema. A separação é feita pelos prefixos `brz_`, `slv_` e `gld_`; `sys_` identifica resultados de controle. Não criei catalogos separados para não deixar mais complexo a arquiterura como um todo.
 
 ```mermaid
 flowchart TD
@@ -212,7 +232,12 @@ erDiagram
     DIM_DATE ||--o{ FAT_COUNTRY_POPULATION : referencia_anual
 ```
 
-Os nomes abreviados do diagrama correspondem às tabelas `gld_` descritas abaixo. Os relacionamentos são lógicos. Não foram identificadas declarações de PK/FK no código. A ligação da população à dimensão de datas ainda precisa de validação específica; zero órfãos entre fato clínica e dimensão de estudos não valida todas as relações.
+Os nomes abreviados do diagrama correspondem às tabelas `gld_` descritas abaixo. Os relacionamentos são lógicos. Seguem alguns imagens por liagem de dados.
+
+
+![image_1789978889162.png](./image_1789978889162.png "image_1789978889162.png")
+![image_1789978796552.png](./image_1789978796552.png "image_1789978796552.png")
+![image_1789978839148.png](./image_1789978839148.png "image_1789978839148.png")
 
 ### 3.3 Grãos, chaves e cuidados de agregação
 
@@ -514,21 +539,25 @@ Os campos clínicos indicados por caminhos como `statusModule` pertencem a `payl
 | passed | BOOLEAN | Indicador de aprovação | True quando failure_count=0 | Comparação no Python |
 | execution_timestamp | TIMESTAMP | Instante de gravação da avaliação | Timestamp da escrita; fuso da sessão | current_timestamp() |
 
-### 3.5 Governança e limitações do catálogo
-
-O notebook `estrutura_dos_dados` contém comentários para as seis tabelas Silver. Não foram identificados comandos para comentar todas as colunas, nem todas as tabelas Bronze e Gold. O catálogo textual acima preenche a documentação para revisão, mas não significa que esses comentários já estejam aplicados no Unity Catalog.
-
-**PENDENTE:** conferir os tipos e a nulabilidade finais com `DESCRIBE TABLE`, aplicar os comentários aprovados e capturar o Catalog Explorer. Os schemas de DataFrame não comprovam constraints `NOT NULL`, PK ou FK declaradas no destino.
-
 <a id="pipeline"></a>
 
 ## 4. Pipeline de Dados (Etapa 4.4)
+
+
+
+> **[INSERIR PRINT — E05] Catálogo de dados aplicado**  
+> **Mostrar:** schemas, tipos e comentários das tabelas; usar mais de uma captura para cobrir Bronze, Silver, Gold e controles  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e05.png, descomente a linha seguinte. -->
+<!-- ![E05 — Catálogo de dados aplicado](docs/evidencias/e05.png) -->
 
 ### 4.1 Arquivos e responsabilidades
 
 | Arquivo | Responsabilidade |
 | --- | --- |
-| [config.ipynb](https://github.com/wellingtondmf/pos_puc_2026/blob/main/MVP_ENGENHARIA_DE_DADOS/config.ipynb) | Imports, parâmetros, sessão HTTP, schemas, funções e parsing compartilhado; contém dependências fora de ordem. |
+| [config.ipynb](https://github.com/wellingtondmf/pos_puc_2026/blob/main/MVP_ENGENHARIA_DE_DADOS/config.ipynb) | Imports, parâmetros, sessão HTTP, schemas, funções e parsing compartilhado; inclui leitura da Bronze, criando dependência inadequada para a primeira carga. |
 | [estrutura_dos_dados.ipynb](https://github.com/wellingtondmf/pos_puc_2026/blob/main/MVP_ENGENHARIA_DE_DADOS/estrutura_dos_dados.ipynb) | Criação de catálogo/schema/volume, consultas de validação e comentários Silver; mistura preparação e pós-carga. |
 | [01_etl_brz_clinical_trials_table.ipynb](https://github.com/wellingtondmf/pos_puc_2026/blob/main/MVP_ENGENHARIA_DE_DADOS/01_etl_brz_clinical_trials_table.ipynb) | Busca e paginação clínica; escrita Bronze e asserts de contagem. |
 | [01_etl_brz_world_bank_open_data.ipynb](https://github.com/wellingtondmf/pos_puc_2026/blob/main/MVP_ENGENHARIA_DE_DADOS/01_etl_brz_world_bank_open_data.ipynb) | Coleta de população; escrita Bronze. |
@@ -579,7 +608,96 @@ O notebook `estrutura_dos_dados` contém comentários para as seis tabelas Silve
 
 Todos os notebooks usam caminhos relativos como `%run ./config`; preservar sua organização no workspace. Não há arquivo de dependências/versionamento do ambiente identificado nesta pasta. **PENDENTE:** registrar versão do ambiente Databricks, Python, Spark, `requests` e `urllib3` usada na execução final.
 
-A execução manual é suficiente para o enunciado, desde que reproduzível e documentada. Dashboard, Workflow e CI/CD são melhorias opcionais.
+### 4.3.1 Job agendado e dependências entre tasks
+
+**INFORMADO PELO AUTOR:** foi criado um Job no Databricks com uma task para cada notebook de execução. O Job está agendado para persistir os dados e organiza as dependências por camada: primeiro Bronze, depois Silver e, por último, Gold.
+
+Esta seção registra a implementação relatada. Nome, ID, horário, fuso, parâmetros, condições de dependência e histórico de sucesso precisam ser preenchidos a partir da configuração real. Os DBC não contêm a definição completa do Job.
+
+| Campo | Configuração / informação a completar |
+| --- | --- |
+| Nome e ID do Job | **PREENCHER:** nome, ID e link do Job |
+| Agenda | **PREENCHER:** frequência, horário ou expressão cron e fuso |
+| Estado da agenda | **PREENCHER:** ativa ou pausada |
+| Organização | Uma task por notebook de execução, conforme relato do autor |
+| Sequência | Bronze → Silver → Gold |
+| Compute e identidade de execução | **PREENCHER:** configuração de compute e Run as |
+| Parâmetros | **PREENCHER:** catálogo/schema, período e parâmetros efetivamente usados |
+| Retentativas e timeout | **PREENCHER:** valores reais por task |
+| Concorrência | **PREENCHER:** limite de execuções simultâneas e tratamento de sobreposição |
+| Qualidade | **CONFIRMAR:** task existente e sua posição em relação à Gold |
+| Última execução validada | **PREENCHER:** Run ID, início, fim, estado final e referência das evidências |
+
+#### Mapeamento dos notebooks de execução
+
+Os nomes abaixo são nomes dos notebooks; preencher os identificadores reais das tasks. As dependências específicas descritas derivam das leituras do código e devem ser confrontadas com o grafo configurado.
+
+| Notebook | Camada / responsabilidade | Dependência de dados |
+| --- | --- | --- |
+| `01_etl_brz_clinical_trials_table` | Bronze clínica | Configuração e acesso à API clínica |
+| `01_etl_brz_world_bank_open_data` | Bronze população | Configuração e acesso à API populacional |
+| `02_etl_silver_studies` | Silver estudos | Bronze clínica |
+| `02_etl_silver_conditions` | Silver condições | Bronze clínica |
+| `02_etl_silver_interventions` | Silver intervenções | Bronze clínica |
+| `02_etl_silver_locations` | Silver localizações | Bronze clínica |
+| `02_etl_silver_population` | Silver população | Bronze população |
+| `02_etl_silver_locations_iso3` | Silver geográfica enriquecida | Silver localizações **e** Silver população |
+| `03_etl_gold` | Gold: dimensões, fatos, bridges e indicadores | Silver estudos, intervenções, localizações ISO3 e população; respeitar a barreira entre camadas configurada |
+| `04_qualidade_dados` | Perfil, regras e consultas | Tabelas Silver; confirmar posição e condição de execução no Job |
+
+`config` é chamado por `%run`; confirmar se também existe como task. Uma task de configuração isolada não substitui a inicialização de variáveis em cada notebook. `estrutura_dos_dados` não foi reenviado nesta remessa; confirmar como a preparação dos objetos foi integrada ao Job.
+
+**PONTOS A CONFERIR:** dependência interna da Silver (`locations` + `population` antes de `locations_iso3`); condições de sucesso dos predecessores; inexistência de execução Gold com tabelas Silver antigas após falhas; comportamento em reprocessamentos. O código registra falhas de qualidade, mas não demonstra bloqueio automático da publicação por regras reprovadas. Esse bloqueio deve ser documentado somente se estiver configurado e validado.
+
+#### Roteiro de validação operacional
+
+1. Conferir caminhos dos notebooks, parâmetros e dependências reais das tasks.
+2. Executar uma rodada completa identificada por Run ID após corrigir os problemas aplicáveis.
+3. Conferir início/fim de cada camada e a persistência das tabelas produzidas.
+4. Relacionar os resultados de qualidade à mesma rodada de dados.
+5. Anexar os prints de configuração, agenda, grafo, execução e persistência nos espaços abaixo.
+
+O agendamento comprova a intenção de execução recorrente. A evidência de uma rodada bem-sucedida exige histórico das tasks e validações das tabelas correspondentes.
+
+
+
+> **[INSERIR PRINT — E06] Configuração e grafo do Job**  
+> **Mostrar:** nome do Job, tasks e dependências Bronze → Silver → Gold; destacar a dependência interna da Silver ISO3  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e06.png, descomente a linha seguinte. -->
+<!-- ![E06 — Configuração e grafo do Job](docs/evidencias/e06.png) -->
+
+
+
+> **[INSERIR PRINT — E07] Agendamento do Job**  
+> **Mostrar:** frequência ou cron, fuso e estado ativo/pausado  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e07.png, descomente a linha seguinte. -->
+<!-- ![E07 — Agendamento do Job](docs/evidencias/e07.png) -->
+
+
+
+> **[INSERIR PRINT — E08] Execução completa do Job**  
+> **Mostrar:** Run ID, horários, duração e estado de todas as tasks; identificar a execução utilizada nas contagens  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e08.png, descomente a linha seguinte. -->
+<!-- ![E08 — Execução completa do Job](docs/evidencias/e08.png) -->
+
+
+
+> **[INSERIR PRINT — E09] Persistência Silver**  
+> **Mostrar:** contagem e consulta das seis tabelas Silver, associadas à execução escolhida  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e09.png, descomente a linha seguinte. -->
+<!-- ![E09 — Persistência Silver](docs/evidencias/e09.png) -->
 
 ### 4.4 Evidências de persistência da Gold
 
@@ -602,11 +720,21 @@ A validação da fato clínica retornou **16.736 linhas e 16.736 chaves distinta
 
 Os 261 registros de `gld_dim_country` **não devem ser descritos como 261 países**. A dimensão incorpora os códigos existentes na população, cujo filtro atual não distingue agregados, economias e países.
 
+
+
+> **[INSERIR PRINT — E10] Persistência e integridade Gold**  
+> **Mostrar:** dez contagens Gold, unicidade da fato e verificação de órfãos; informar Run ID e instante da consulta  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e10.png, descomente a linha seguinte. -->
+<!-- ![E10 — Persistência e integridade Gold](docs/evidencias/e10.png) -->
+
 ### 4.5 Correções e investigações técnicas
 
 | ID | Prioridade | Diagnóstico | Ação necessária | Critério de conclusão |
 | --- | --- | --- | --- | --- |
-| C01 | Alta | `clinical_json_schema` usado antes da definição em `config` | Reordenar definições antes do parsing | `%run` concluído em sessão limpa |
+| C01 | Alta | O DBC de condições registra `NameError: clinical_json_schema`; o `config.dbc` atual define o schema antes do parsing quando ordenado por `position` | Sincronizar a versão de config usada pelas tasks e reexecutar em sessão limpa | Todas as chamadas de config concluídas na mesma execução |
 | C02 | Alta | `config` lê Bronze e é chamado antes da criação/ingestão | Separar configuração de leitura e transformação | Primeira carga em ambiente vazio executada |
 | C03 | Alta | Gold exportada contém falha posterior no `%run ./config` | Corrigir dependências e executar todas as células em ordem | Nova exportação com execução completa e consistente |
 | C04 | Alta | Primeira célula de qualidade contém apenas nomes de tabelas após `%sql` | Converter em Markdown ou SQL válido | Notebook de qualidade executa do início ao fim |
@@ -623,7 +751,17 @@ Os 261 registros de `gld_dim_country` **não devem ser descritos como 261 paíse
 | C15 | Média | Cobertura da dimensão de datas depende só das datas clínicas | Validar chaves das duas fatos contra a dimensão | Zero órfãos indevidos em datas; ausências legítimas separadas |
 | C16 | Média | Auditoria de perda e perfil Bronze não foram executados nas evidências | Comparar antes/depois dos filtros e deduplicações | Quantidades e motivos registrados |
 
-**Causa da falha exportada:** o arquivo da Gold contém apenas a mensagem genérica de que a execução não terminou com sucesso. C01 e C02 são defeitos identificados no código, mas o DBC não fornece stack trace suficiente para atribuir a falha de 21/09 exclusivamente a um deles.
+**Revisão do diagnóstico:** a ordem das células no array interno do DBC não é a ordem visual do notebook; deve-se usar o campo `position`. No `config.dbc` recebido, o schema vem antes do parsing. Portanto, a afirmação anterior de que a primeira célula usa o schema antes da definição foi corrigida. O DBC de condições registra um `NameError` histórico, a Bronze clínica registra `Notebook not found` no `%run ./config`, e a Gold registra falha genérica. Essas saídas podem refletir versões distintas de config. A leitura da Bronze dentro de config continua sendo uma dependência concreta que dificulta a primeira carga em ambiente vazio.
+
+
+
+> **[INSERIR PRINT — E11] Correções e nova execução**  
+> **Mostrar:** erro original e resultado após correção, incluindo importação de config e execução sequencial limpa  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e11.png, descomente a linha seguinte. -->
+<!-- ![E11 — Correções e nova execução](docs/evidencias/e11.png) -->
 
 <a id="qualidade"></a>
 
@@ -668,6 +806,16 @@ As 15 regras complementam o perfil com formato de identificador, duplicidades, d
 
 Foram aprovadas **13 de 15 regras**. Entre as 13 regras de severidade ERROR, 12 passaram e uma sinalizou 32 ocorrências. Entre as duas WARNING, uma passou e uma sinalizou 2.493 ocorrências. Isso não significa que 13/15 dos dados estejam corretos: aprovação de regras e proporção de registros válidos são medidas diferentes. Somar falhas de regras também não produz necessariamente quantidade de registros únicos afetados.
 
+
+
+> **[INSERIR PRINT — E12] Resultados das regras de qualidade**  
+> **Mostrar:** 15 regras, severidades, ocorrências e aprovação; comparação antes/depois das correções  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e12.png, descomente a linha seguinte. -->
+<!-- ![E12 — Resultados das regras de qualidade](docs/evidencias/e12.png) -->
+
 ### 5.3 Problemas e limitações efetivamente observados
 
 | Achado | Evidência | Interpretação e tratamento nesta versão |
@@ -694,6 +842,16 @@ O código já normaliza textos, remove duplicidades, filtra nomes/países nulos 
 
 O mapeamento ISO3 não foi complementado nesta revisão, e a regra de status não foi alterada. Nenhum outlier foi removido. Após a correção, registrar: tabela, regra, quantidade anterior, quantidade posterior, decisão, justificativa e impacto sobre as perguntas.
 
+
+
+> **[INSERIR PRINT — E13] Cobertura geográfica e status**  
+> **Mostrar:** países sem mapeamento, estudos afetados e domínio de status após revisão  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e13.png, descomente a linha seguinte. -->
+<!-- ![E13 — Cobertura geográfica e status](docs/evidencias/e13.png) -->
+
 ### 5.5 Análise de outliers proposta — ainda não executada
 
 1. Separar estudos por tipo, fase e natureza efetiva/estimada dos valores.
@@ -702,6 +860,16 @@ O mapeamento ISO3 não foi complementado nesta revisão, e a regra de status nã
 4. Inspecionar `nct_id`, payload, datas originais e contexto dos registros sinalizados.
 5. Comparar médias com medianas e apresentar análise de sensibilidade, quando houver exclusão justificada.
 6. Para população, separar agregados de países antes de procurar extremos.
+
+
+
+> **[INSERIR PRINT — E14] Investigação de outliers**  
+> **Mostrar:** registros extremos, critério utilizado, decisão e efeito nas análises  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e14.png, descomente a linha seguinte. -->
+<!-- ![E14 — Investigação de outliers](docs/evidencias/e14.png) -->
 
 ### 5.6 Perfil completo por atributo
 
@@ -755,6 +923,16 @@ Os números abaixo foram transcritos das saídas do DBC. A coluna de intervalo c
 | slv_studies | ingestion_id | 16.736 | 0 | 0,0 | 1 | Ver domínio no catálogo |
 | slv_studies | collected_at | 16.736 | 0 | 0,0 | 1 | 2026-08-22 17:12:52.889279 a 2026-08-22 17:12:52.889279 |
 
+
+
+> **[INSERIR PRINT — E15] Perfilamento das colunas**  
+> **Mostrar:** nulos, distintos, mínimos e máximos; capturas legíveis por tabela, sem resumir tudo em uma imagem ilegível  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e15.png, descomente a linha seguinte. -->
+<!-- ![E15 — Perfilamento das colunas](docs/evidencias/e15.png) -->
+
 <a id="analise"></a>
 
 ## 6. Análise de Dados (Etapa 4.5)
@@ -805,7 +983,16 @@ ORDER BY study_count DESC;
 
 **CORRIGIR NA ANÁLISE:** `COALESCE` reúne 3.684 fases nulas com registros explicitamente classificados como `NA`. O grupo mostrado como NA tem 8.575 estudos. Pela conciliação das duas saídas, 4.891 correspondem a NA explícito, desde que ambas reflitam a mesma versão da Silver. Confirmar com consulta separada antes de publicar esse detalhamento. Não descrever os 8.575 como “fase ausente” nem como “não aplicável” sem distinção.
 
-**Evidência visual:** PENDENTE inserir screenshot da consulta final, preferencialmente após separar `SEM_INFORMACAO` de `NA`.
+
+
+> **[INSERIR PRINT — E16] Pergunta 4 — fases**  
+> **Mostrar:** SQL e resultado, separando fase ausente de NA e mostrando o tipo de estudo  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e16.png, descomente a linha seguinte. -->
+<!-- ![E16 — Pergunta 4 — fases](docs/evidencias/e16.png) -->
+
 
 ### 6.3 Pergunta 5 — Quais tipos de intervenção são mais estudados?
 
@@ -835,7 +1022,16 @@ ORDER BY study_count DESC;
 
 Um estudo pode conter vários tipos. Portanto, a soma das categorias supera a quantidade de estudos únicos com intervenções. O perfil mostra **15.264 `nct_id` distintos** em `slv_interventions`, diante de 16.736 estudos totais. A diferença de 1.472 indica estudos sem linha nessa Silver; a causa pode envolver ausência de intervenção na origem ou filtros, e precisa ser apurada antes de classificar como falha.
 
-**Evidência visual:** PENDENTE inserir screenshot da consulta e, se desejado, gráfico de barras.
+
+
+> **[INSERIR PRINT — E17] Pergunta 5 — tipos de intervenção**  
+> **Mostrar:** SQL, estudos distintos por categoria e interpretação da possibilidade de múltiplos tipos por estudo  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e17.png, descomente a linha seguinte. -->
+<!-- ![E17 — Pergunta 5 — tipos de intervenção](docs/evidencias/e17.png) -->
+
 
 ### 6.4 Pergunta 7 — Como os estudos estão distribuídos por situação?
 
@@ -868,7 +1064,16 @@ ORDER BY study_count DESC;
 
 `COMPLETED` indica situação do estudo, não sucesso terapêutico. `TERMINATED`, `WITHDRAWN` e `SUSPENDED` devem ser interpretados conforme as definições da fonte e não agrupados automaticamente como a mesma ocorrência. As quatro categorias de acesso expandido presentes no resultado não são erros de formato.
 
-Os percentuais podem apresentar diferença residual na soma por arredondamento. **Evidência visual:** PENDENTE inserir screenshot da consulta.
+Os percentuais podem apresentar diferença residual na soma por arredondamento. 
+
+> **[INSERIR PRINT — E18] Pergunta 7 — situação dos estudos**  
+> **Mostrar:** SQL, contagens, percentuais e data da base avaliada  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/e18.png, descomente a linha seguinte. -->
+<!-- ![E18 — Pergunta 7 — situação dos estudos](docs/evidencias/e18.png) -->
+
 
 ### 6.5 Regras de interpretação para as análises ainda pendentes
 
@@ -888,6 +1093,92 @@ O MVP já transforma cadastros públicos em uma base consultável de 16.736 estu
 
 A análise ainda não responde integralmente ao problema original: distribuição geográfica, evolução por registro, comparação do Brasil, duração, participantes e patrocinadores não possuem resultados finais documentados. O mapeamento geográfico incompleto, o tratamento de datas e a distinção entre entidades geográficas exigem revisão antes dessas conclusões.
 
+
+### 6.7 Espaços para evidências das perguntas ainda pendentes
+
+Em cada item, acrescentar a consulta executada, tabela de resultados e interpretação antes do print. A imagem complementa o resultado textual e não substitui a análise.
+
+
+> **[INSERIR PRINT — Q01] Pergunta 1 — Estudos registrados por ano**  
+> **Mostrar:** consulta, filtros, período, resultado e quantidade de observações elegíveis; registrar limitações e conclusão  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/q01.png, descomente a linha seguinte. -->
+<!-- ![Q01 — Pergunta 1 — Estudos registrados por ano](docs/evidencias/q01.png) -->
+
+
+> **[INSERIR PRINT — Q02] Pergunta 2 — Distribuição por país**  
+> **Mostrar:** consulta, filtros, período, resultado e quantidade de observações elegíveis; registrar limitações e conclusão  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/q02.png, descomente a linha seguinte. -->
+<!-- ![Q02 — Pergunta 2 — Distribuição por país](docs/evidencias/q02.png) -->
+
+
+> **[INSERIR PRINT — Q03] Pergunta 3 — Ranking de países**  
+> **Mostrar:** consulta, filtros, período, resultado e quantidade de observações elegíveis; registrar limitações e conclusão  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/q03.png, descomente a linha seguinte. -->
+<!-- ![Q03 — Pergunta 3 — Ranking de países](docs/evidencias/q03.png) -->
+
+
+> **[INSERIR PRINT — Q06] Pergunta 6 — Tratamentos ou medicamentos frequentes**  
+> **Mostrar:** consulta, filtros, período, resultado e quantidade de observações elegíveis; registrar limitações e conclusão  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/q06.png, descomente a linha seguinte. -->
+<!-- ![Q06 — Pergunta 6 — Tratamentos ou medicamentos frequentes](docs/evidencias/q06.png) -->
+
+
+> **[INSERIR PRINT — Q08] Pergunta 8 — Duração média**  
+> **Mostrar:** consulta, filtros, período, resultado e quantidade de observações elegíveis; registrar limitações e conclusão  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/q08.png, descomente a linha seguinte. -->
+<!-- ![Q08 — Pergunta 8 — Duração média](docs/evidencias/q08.png) -->
+
+
+> **[INSERIR PRINT — Q09] Pergunta 9 — Participantes por fase**  
+> **Mostrar:** consulta, filtros, período, resultado e quantidade de observações elegíveis; registrar limitações e conclusão  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/q09.png, descomente a linha seguinte. -->
+<!-- ![Q09 — Pergunta 9 — Participantes por fase](docs/evidencias/q09.png) -->
+
+
+> **[INSERIR PRINT — Q10] Pergunta 10 — Patrocinadores**  
+> **Mostrar:** consulta, filtros, período, resultado e quantidade de observações elegíveis; registrar limitações e conclusão  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/q10.png, descomente a linha seguinte. -->
+<!-- ![Q10 — Pergunta 10 — Patrocinadores](docs/evidencias/q10.png) -->
+
+
+> **[INSERIR PRINT — Q11] Pergunta 11 — Fase, participantes e duração**  
+> **Mostrar:** consulta, filtros, período, resultado e quantidade de observações elegíveis; registrar limitações e conclusão  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/q11.png, descomente a linha seguinte. -->
+<!-- ![Q11 — Pergunta 11 — Fase, participantes e duração](docs/evidencias/q11.png) -->
+
+
+> **[INSERIR PRINT — Q12] Pergunta 12 — Brasil e outros países**  
+> **Mostrar:** consulta, filtros, período, resultado e quantidade de observações elegíveis; registrar limitações e conclusão  
+> **Preencher:** data/hora e fuso da captura, Run ID (quando aplicável), notebook/task e interpretação do resultado.  
+> **Estado:** PENDENTE — imagem ainda não anexada.
+
+<!-- Ao adicionar o arquivo em docs/evidencias/q12.png, descomente a linha seguinte. -->
+<!-- ![Q12 — Pergunta 12 — Brasil e outros países](docs/evidencias/q12.png) -->
+
 <a id="autoavaliacao"></a>
 
 ## 7. Autoavaliação
@@ -898,11 +1189,12 @@ A análise ainda não responde integralmente ao problema original: distribuiçã
 
 | Objetivo | Avaliação atual |
 | --- | --- |
-| Construir ingestão de duas fontes | Código implementado; rastros de coleta presentes nas camadas posteriores; falta evidência direta da conciliação Bronze |
+| Construir ingestão de duas fontes | Coleta clínica conciliada em 16.736 registros; população com 6.890 registros coletados; falta conciliar metadados e persistência populacional |
 | Organizar Bronze, Silver e Gold | Implementado, com evidências numéricas Silver e Gold |
 | Criar modelo dimensional | Implementado, com fatos, dimensões e bridges; integridade parcialmente validada |
 | Medir qualidade | Perfil e 15 regras executados; corrigir domínio de status e ampliar cobertura |
 | Responder às perguntas | Três consultas com resultados; fase precisa de revisão semântica; demais respostas pendentes |
+| Orquestrar execução | Job agendado, uma task por notebook e dependências por camada, informados pelo autor; prints pendentes |
 | Garantir reprodução completa | Parcial: dependências de configuração e falha posterior ainda impedem comprovação |
 | Documentar o projeto | Este README consolida a documentação; comentários no catálogo, licenças clínicas, screenshots e revisão do autor continuam pendentes |
 
@@ -912,7 +1204,7 @@ O projeto atingiu parte relevante do objetivo técnico ao estruturar a ingestão
 
 Os objetivos analíticos foram atingidos parcialmente. Há resultados para situação, fase e tipo de intervenção, mas a avaliação de fase precisa separar ausência de informação de não aplicabilidade. As demais perguntas permanecem no escopo e demandam consultas, resultados e discussão.
 
-A revisão identificou dependências inadequadas na configuração, diferenças semânticas entre data de início e registro, regras de status incompletas e lacunas no mapeamento geográfico. Esses pontos devem ser tratados antes de considerar o pipeline integralmente reproduzível. As limitações e perguntas não respondidas ficam explícitas, evitando apresentar implementação como se fosse conclusão analítica.
+A revisão identificou dependência da Bronze na configuração e falhas históricas de importação, diferenças semânticas entre data de início e registro, regras de status incompletas e lacunas no mapeamento geográfico. Esses pontos devem ser tratados antes de considerar o pipeline integralmente reproduzível. As limitações e perguntas não respondidas ficam explícitas, evitando apresentar implementação como se fosse conclusão analítica.
 
 ### 7.3 Campos que dependem do relato pessoal
 
@@ -929,11 +1221,56 @@ A revisão identificou dependências inadequadas na configuração, diferenças 
 4. Guardar precisão e natureza das datas ao longo de toda a Gold.
 5. Normalizar intervenções para reduzir variações de nomes, com critérios verificáveis.
 6. Ampliar validações de integridade para todas as dimensões e tabelas associativas.
-7. Adicionar orquestração e visualizações interativas, se houver benefício. São melhorias opcionais, não requisitos obrigatórios desta entrega.
+7. Evoluir o Job agendado já criado com alertas, histórico operacional e controle de qualidade antes da publicação Gold; adicionar visualizações quando úteis.
 
 <a id="entrega"></a>
 
 ## 8. Evidências e checklist de entrega
+
+### 8.0 Como inserir os prints neste Markdown
+
+Salvar este README na raiz da pasta do MVP e criar `docs/evidencias/` abaixo dela. Cada marcação local informa o nome sugerido do arquivo, o que capturar e a legenda a preencher. Os caminhos são relativos ao README.
+
+As linhas de imagem estão comentadas para evitar imagens quebradas enquanto os arquivos não existem. Ao inserir o print, retirar `<!--` e `-->` da linha correspondente, atualizar o estado para **ANEXADO** e preencher a legenda. Exemplo:
+
+```markdown
+![E06 — Configuração e grafo do Job](docs/evidencias/e06.png)
+
+Legenda: Job [nome], Run ID [id], captura em [data/hora/fuso].
+Resultado observado: [descrever a evidência e suas limitações].
+```
+
+Usar PNG ou JPG com texto legível. Se necessário, dividir uma evidência em `e06-01.png`, `e06-02.png` etc. Preservar contexto de consulta, tabela, execução e data. Não inserir tokens ou credenciais. Adicionar os arquivos de imagem ao repositório junto com o README para que os links funcionem.
+
+| Marcação | Evidência | Arquivo sugerido |
+| --- | --- | --- |
+| E01 | Catálogo, schema e armazenamento | `docs/evidencias/e01.png` |
+| E02 | Paginação e conciliação clínica | `docs/evidencias/e02.png` |
+| E03 | Coleta populacional e completude | `docs/evidencias/e03.png` |
+| E04 | Modelo e linhagem | `docs/evidencias/e04.png` |
+| E05 | Catálogo de dados aplicado | `docs/evidencias/e05.png` |
+| E06 | Configuração e grafo do Job | `docs/evidencias/e06.png` |
+| E07 | Agendamento do Job | `docs/evidencias/e07.png` |
+| E08 | Execução completa do Job | `docs/evidencias/e08.png` |
+| E09 | Persistência Silver | `docs/evidencias/e09.png` |
+| E10 | Persistência e integridade Gold | `docs/evidencias/e10.png` |
+| E11 | Correções e nova execução | `docs/evidencias/e11.png` |
+| E12 | Resultados das regras de qualidade | `docs/evidencias/e12.png` |
+| E13 | Cobertura geográfica e status | `docs/evidencias/e13.png` |
+| E14 | Investigação de outliers | `docs/evidencias/e14.png` |
+| E15 | Perfilamento das colunas | `docs/evidencias/e15.png` |
+| E16 | Pergunta 4 — fases | `docs/evidencias/e16.png` |
+| E17 | Pergunta 5 — tipos de intervenção | `docs/evidencias/e17.png` |
+| E18 | Pergunta 7 — situação dos estudos | `docs/evidencias/e18.png` |
+| Q01 | Pergunta 1 — Estudos registrados por ano | `docs/evidencias/q01.png` |
+| Q02 | Pergunta 2 — Distribuição por país | `docs/evidencias/q02.png` |
+| Q03 | Pergunta 3 — Ranking de países | `docs/evidencias/q03.png` |
+| Q06 | Pergunta 6 — Tratamentos ou medicamentos frequentes | `docs/evidencias/q06.png` |
+| Q08 | Pergunta 8 — Duração média | `docs/evidencias/q08.png` |
+| Q09 | Pergunta 9 — Participantes por fase | `docs/evidencias/q09.png` |
+| Q10 | Pergunta 10 — Patrocinadores | `docs/evidencias/q10.png` |
+| Q11 | Pergunta 11 — Fase, participantes e duração | `docs/evidencias/q11.png` |
+| Q12 | Pergunta 12 — Brasil e outros países | `docs/evidencias/q12.png` |
 
 ### 8.1 Evidências a incorporar ao repositório
 
@@ -941,7 +1278,7 @@ Os arquivos DBC recebidos sustentam esta documentação, mas não aparecem na á
 
 | Evidência | Estado atual | Complemento necessário |
 | --- | --- | --- |
-| Coleta clínica e paginação | Código disponível | Screenshot/log real das páginas e total da API versus persistido |
+| Coleta clínica e paginação | Log de 17 páginas e conciliação de 16.736 registros no DBC | Inserir print identificado por execução |
 | Coleta populacional | Código e metadados posteriores | Total bruto, páginas e conciliação com metadados |
 | Tabelas Silver e Gold | Contagens nas saídas exportadas | Screenshots de persistência no workspace |
 | Catálogo de dados | Catálogo textual neste README | Screenshots do Catalog Explorer e comentários de colunas |
@@ -949,7 +1286,8 @@ Os arquivos DBC recebidos sustentam esta documentação, mas não aparecem na á
 | Qualidade | Perfil e regras no DBC | Capturas legíveis e comparação depois das correções |
 | Perguntas 4, 5 e 7 | Resultados numéricos disponíveis | Capturas finais e ajuste da análise de fases |
 | Outras nove perguntas | Planejamento documentado | Consultas, resultados, interpretação e screenshots |
-| Execução completa | Ainda não comprovada | Nova execução sequencial limpa e exportação consistente |
+| Job e agendamento | Criados conforme relato do autor | E06: grafo; E07: agenda e fuso |
+| Execução completa | Ainda não comprovada por evidência do Job | E08: rodada completa e exportação consistente |
 
 Screenshots devem mostrar contexto suficiente para identificar a consulta ou tabela, o resultado e a etapa. Vídeo e áudio não substituem as evidências exigidas. A inclusão dos DBC é complementar; não elimina a exigência de screenshots no documento final.
 
@@ -966,7 +1304,10 @@ Screenshots devem mostrar contexto suficiente para identificar a consulta ou tab
 - [x] Licença do indicador de população e atribuição documentadas.
 - [ ] Confirmar condições de reutilização do ClinicalTrials.gov.
 - [ ] Corrigir dependências, célula SQL inválida e reexecutar em sessão limpa.
-- [ ] Validar completude de ambas as coletas e registrar evidência Bronze.
+- [x] Conciliação clínica de 16.736 registros identificada no DBC.
+- [ ] Conciliar coleta populacional com metadados, persistência e perdas na Silver.
+- [x] Job agendado e tasks por notebook documentados conforme relato do autor.
+- [ ] Preencher agenda, fuso, Run ID e dependências reais; anexar evidências do Job.
 - [ ] Ajustar domínio de status e reavaliar regras.
 - [ ] Complementar mapeamento de países e excluir agregados indevidos das comparações.
 - [ ] Investigar datas, participantes extremos e demais outliers.
@@ -1077,14 +1418,26 @@ WHERE d.date_key IS NULL;
 
 ### 10.1 Identificação dos arquivos de evidência
 
-Os hashes abaixo permitem identificar os arquivos exatos usados nesta revisão. Não representam verificação de assinatura, execução ou equivalência com o estado atual do workspace.
+Os hashes abaixo permitem identificar os arquivos exatos usados nesta revisão. Não representam verificação de assinatura, execução ou equivalência com o estado atual do workspace. Cada arquivo desta remessa tem o mesmo hash do respectivo notebook recebido anteriormente.
 
-| Arquivo recebido | SHA-256 |
-| --- | --- |
-| 03_etl_gold.dbc | ece58fe4cdbcff7ed3582c28b9341b379d18304d9e54e926d870dac6a6c7ed25 |
-| 04_qualidade_dados.dbc | 40357cbc321a52d37998cb97b184e7b4cbc33e0e21f01c181d3b187660eb0eb6 |
+| Arquivo desta remessa | SHA-256 | Comparação com o anterior |
+| --- | --- | --- |
+| `01_etl_brz_clinical_trials_table(1).dbc` | `0b3c1c51cc6019192c9bf239d588ede6c31a2e52cf11b4d358b5f31bd70ee75f` | Idêntico |
+| `01_etl_brz_world_bank_open_data(1).dbc` | `563bf70437656a608fadf269d5cb3d8c87c53d60742d57e857c0a3e6cca0b7eb` | Idêntico |
+| `02_etl_silver_conditions(1).dbc` | `abd3a76b726c803fca65778a3cab00671b2290d000cf0931946b1d35e675eace` | Idêntico |
+| `02_etl_silver_interventions(1).dbc` | `5aaa52efd61bcae54aacdaf1db6fa613fdf885956639030b0c7990a419623edf` | Idêntico |
+| `02_etl_silver_locations(1).dbc` | `73914aa5310b6e90012ac621b46cd46542ed4484cde058eac611a59fa213a54e` | Idêntico |
+| `02_etl_silver_locations_iso3(1).dbc` | `33bfc3f2f385bfa6a4610e610540853772bacf90df0db3cda4c83d10e54e22ed` | Idêntico |
+| `02_etl_silver_population(1).dbc` | `583ae889e236c8999ddb70947f7d8aecf18575d38fc3ee9e91ea388b6a3896ac` | Idêntico |
+| `02_etl_silver_studies(1).dbc` | `ecbb560b31a3c13086e88ae3dee20a75a4dd09ca3f53746fd070d9a42d8aa958` | Idêntico |
+| `03_etl_gold(2).dbc` | `ece58fe4cdbcff7ed3582c28b9341b379d18304d9e54e926d870dac6a6c7ed25` | Idêntico |
+| `04_qualidade_dados(2).dbc` | `40357cbc321a52d37998cb97b184e7b4cbc33e0e21f01c181d3b187660eb0eb6` | Idêntico |
+| `config(1).dbc` | `66b40f1002b8b3352fe27041d1476044752f21644c3d6213e15bff3d08595020` | Idêntico |
 
 ### 10.2 Escopo desta versão documental
+
+Esta revisão inclui o Job agendado informado pelo autor e espaços Markdown para 27 evidências. Nenhuma configuração JSON/YAML do Job ou nova captura de execução foi recebida nesta solicitação. Os resultados históricos não comprovam uma execução do novo Job. Os 11 notebooks reenviados foram conferidos nesta revisão e são idênticos aos anteriores. A tabela da seção 10.1 identifica os nomes exatos desta remessa. O notebook de preparação `estrutura_dos_dados` e a definição do Job não integram os anexos recebidos.
+
 
 Este documento foi produzido pela inspeção do código e das saídas recebidas, com referências oficiais para a licença populacional e os domínios de status. As novas consultas da seção 9 são propostas. Os números das seções 4, 5 e 6 foram obtidos das saídas exportadas, e as interpretações e recomendações foram elaboradas para revisão do autor.
 
