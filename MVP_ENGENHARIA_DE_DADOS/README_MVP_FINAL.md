@@ -665,9 +665,9 @@ O encadeamento lógico deve garantir também que `slv_locations` e `slv_populati
 > **Evidência — E07: Execução manual e via Job**  
 > Obs: Run ID, horários e status de todas as tasks da rodada final, além das validações manuais.  
 
-<![E06 — Execução Manuel e Job](IMAGENS/E07_Execucao_manual_Job.png) -->
+<![E07 — Execução Manuel e Job](IMAGENS/E07_Execucao_manual_Job.png) -->
 
-### 4.4 Contagens Gold da nova remessa
+### 4.4 Contagens Gold
 
 | Tabela | Linhas |
 | --- | --- |
@@ -682,14 +682,11 @@ O encadeamento lógico deve garantir também que `slv_locations` e `slv_populati
 | gld_flat_bridge_study_location | 24.918 |
 | gld_flat_country_year_metrics | 1.871 |
 
-As saídas de contagem e as duas validações da Gold possuem metadados de 21/09/2026. A fato contém 16.829 linhas e 16.829 chaves distintas; o join com gld_dim_study apresenta zero órfãos. Esses números substituem os 16.736 estudos da documentação anterior.
+As saídas de contagem e as duas validações da Gold possuem metadados de 21/09/2026. A fato contém 16.829 linhas e 16.829 chaves distintas; o join com gld_dim_study apresenta zero Cartesiano. Esses números substituem os 16.736 estudos da documentação anterior.
 
-> **INSERIR PRINT — E08: Persistência e validação Gold**  
-> Mostrar: as dez contagens, unicidade da fato e ausência de órfãos na relação estudo.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
-
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![E08 — Persistência e validação Gold](docs/evidencias/e08.png) -->
+> **Evidência — E08: Persistência e validação Gold**  
+> Obs: as dez contagens, unicidade da fato e ausência de órfãos na relação estudo.  
+<![E08 — Persistência e validação Gold](IMAGENS/E08_Persistência_validação_Gold.png) -->
 
 <a id="qualidade"></a>
 ## 5. Qualidade de dados
@@ -716,15 +713,15 @@ O perfilamento calcula total, não nulos, nulos, percentual de nulos, distintos 
 | ORPHAN_LOCATION | slv_locations_iso3 | ERROR | 0 | Aprovada |
 | ORPHAN_INTERVENTION | slv_interventions | ERROR | 0 | Aprovada |
 
-**13 de 15 regras aprovadas.** O resultado detalhado de 21/09 registra 2.511 localizações sem ISO3 e 32 status fora da lista local. A consulta-resumo por severidade ainda contém uma saída de 31/08 com 2.493 localizações; ela não é a referência atual e deve ser reexecutada para a captura final.
+**13 de 15 regras aprovadas.** O resultado detalhado de 21/09 registra 2.511 localizações sem ISO3 e 32 status fora da lista local. 
 
-Os 32 casos correspondem a NO_LONGER_AVAILABLE (13), APPROVED_FOR_MARKETING (10), AVAILABLE (8) e TEMPORARILY_NOT_AVAILABLE (1). A enumeração oficial da fonte reconhece essas situações; a regra local não as contempla. Corrigir a lista da regra, sem alterar valores válidos da origem. Referência: [ClinicalTrials.gov — estrutura dos dados](https://clinicaltrials.gov/data-api/about-api/study-data-structure).
+- Os 32 casos correspondem a NO_LONGER_AVAILABLE (13), APPROVED_FOR_MARKETING (10), AVAILABLE (8) e TEMPORARILY_NOT_AVAILABLE (1). A enumeração oficial da fonte reconhece essas situações; a regra local não as contempla.
 
-As 2.511 localizações sem ISO3 representam 1,2369% de 203.002 linhas; não são 2.511 países nem estudos. São mantidas na Silver e descartadas da bridge geográfica. Deve-se medir quantos estudos perdem representação por causa disso.
+- As 2.511 localizações sem ISO3 representam 1,2369% de 203.002 linhas; não são 2.511 países nem estudos. São mantidas na Silver e descartadas da bridge geográfica. Deve-se medir quantos estudos perdem representação por causa disso.
 
 ### 5.2 Perfil completo das colunas Silver
 
-O quadro foi reconstruído diretamente das 45 linhas da saída atual. Extremos de strings livres foram omitidos: ordem lexical não constitui domínio de negócio. As descrições e origens estão no catálogo.
+O quadro foi reconstruído diretamente das 45 linhas da saída atual. Extremos de strings sem formatação foram omitidos: ordem lexical não constitui domínio de negócio. As descrições e origens estão no catálogo.
 
 | Tabela | Coluna | Linhas | Nulos | Nulos (%) | Distintos | Intervalo numérico/temporal |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -780,34 +777,31 @@ Há 3.705 estudos com fase nula, 239 com participantes nulos e 607 com duração
 
 O perfil é posterior aos filtros. Ele não quantifica individualmente as linhas eliminadas na Bronze → Silver. Zero falhas em população nula não prova completude na origem, pois a Silver já exclui nulos. Valores zero de população passam na regra atual e exigem proteção antes de uma divisão. Strings vazias não são nulos.
 
-Os resultados completos da flat país–ano têm 291 linhas sem população e 28 linhas com ano nulo, calculados nesta revisão. Anos fora de 2000–2025, ausência de código na população e ano de início nulo podem impedir o denominador; as causas precisam ser discriminadas. Não preencher taxas ausentes com zero.
+Os resultados completos da flat país–ano têm 291 linhas sem população e 28 linhas com ano nulo, calculados nesta revisão. Anos fora de 2000–2025, ausência de código na população e ano de início nulo podem impedir o denominador; 
 
 ### 5.4 Rastreabilidade temporal das exportações
 
 O perfil populacional registra collected_at = `2026-09-21 10:04:32.845896`. O perfil clínico registra `2026-09-21 10:11:41.069693`, embora algumas células de leitura manual tenham timestamps anteriores. Esse desencontro pode decorrer de execuções sobrepostas ou saídas de rodadas diferentes; a causa não foi determinada. Não usar esses timestamps como prova de uma única sequência de carga sem Run ID e versões das tabelas.
 
-Os anexos ainda apresentam mensagens no `%run` da Bronze clínica, condições e Gold. O autor relata sucesso final das execuções. Registrar uma exportação consistente e os prints de sucesso resolve essa divergência documental. Não se afirma que essas mensagens descrevem o estado atual do Job.
 
-> **INSERIR PRINT — E09: Perfil Silver**  
-> Mostrar: nulos, distintos e extremos com contexto de execução.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+> **Evidência — E09: Perfil Silver**  
+> Obs: Função criada para qualificar e quantificar métricas como Null e erregularidades.  
+<![E09 — Perfil Silver](IMAGENS/E09_Perfil_Silver.png) -->
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![E09 — Perfil Silver](docs/evidencias/e09.png) -->
+Obs: nulos, distintos e extremos com contexto de execução.  
 
-> **INSERIR PRINT — E10: Regras de qualidade**  
-> Mostrar: 15 regras e resumo atualizado com 2.511 localizações sem ISO3.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+<![E09 — Perfil Silver](IMAGENS/E09_Perfil_Silver_2.png) -->
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![E10 — Regras de qualidade](docs/evidencias/e10.png) -->
+> **Evidência — E10: Regras de qualidade**  
+> Obs: 15 regras e resumo atualizado feita em lista de dicionários.
 
-> **INSERIR PRINT — E11: Tratamento das exceções**  
-> Mostrar: países sem ISO3, domínio corrigido de status e inspeção de outliers.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+<![E10 — Regras de qualidade](IMAGENS/E10_Regras_de_qualidade.png) -->
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![E11 — Tratamento das exceções](docs/evidencias/e11.png) -->
+> **Evidência — E11: Análise das ocorrências de qualidade**  
+> Obs: países sem ISO3, domínio corrigido de status e inspeção de outliers. O processo de qualidade executa a lista de dicionarios e inclui a validação de cada regra em um dataframe, que posteriormente será salvo em uma tabela delta.
+
+<![E11 — Análise das ocorrências de qualidade](IMAGENS/E11_Análise_das_ocorrencias_de_qualidade.png) -->
+
 
 <a id="analise"></a>
 ## 6. Análise dos resultados
@@ -859,7 +853,7 @@ Consulta equivalente para reprodução no Databricks, não executada nesta revis
 
 ```sql
 SELECT country_iso3, country_name, SUM(study_count) AS studies
-FROM mvp_eng_dados.mvp_cancer.gld_flat_country_year_metrics
+  FROM mvp_eng_dados.mvp_cancer.gld_flat_country_year_metrics
 GROUP BY country_iso3, country_name
 ORDER BY studies DESC, country_iso3;
 ```
@@ -1109,8 +1103,8 @@ As imagens complementam as tabelas e interpretações. Não expor credenciais ou
 ### 8.5 Índice dos espaços de evidência
 | Código | Conteúdo | Caminho sugerido |
 | --- | --- | --- |
-| E01 | Ambiente e armazenamento | `docs/evidencias/e01.png` |
-| E02 | Conciliação clínica | `docs/evidencias/e02.png` |
+| E01 | Ambiente e armazenamento | `MVP_ENGENHARIA_DE_DADOS/01_etl_brz_clinical_trials_table` |
+| E02 | Conciliação clínica | `MVP_ENGENHARIA_DE_DADOS/01_etl_brz_world_bank_open_data` |
 | E03 | Coleta populacional | `docs/evidencias/e03.png` |
 | E04 | Modelagem e catálogo | `docs/evidencias/e04.png` |
 | E05 | Grafo do Job | `docs/evidencias/e05.png` |
