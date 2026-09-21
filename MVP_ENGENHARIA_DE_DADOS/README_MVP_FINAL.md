@@ -156,15 +156,15 @@ flowchart TD
     G --> A["Consultas de negócio"]
 ```
 
-O diagrama é uma representação lógica das leituras e transformações identificadas, não uma captura automática do Unity Catalog. `slv_conditions` mantém informação relevante na Silver, mas não possui uma dimensão ou bridge correspondente na Gold atual.
+O diagrama é uma representação lógica das leituras e transformações identificadas.
 
 ### 3.2 O que representam fatos, dimensões e flats
 
 **Dimensões** descrevem as entidades usadas para filtrar, agrupar e interpretar as medidas: estudo, patrocinador, intervenção, país e data. **Fatos** armazenam medidas no grão definido: participantes e duração por estudo; população por entidade geográfica e ano.
 
-As **bridges** representam relações de muitos para muitos. Um estudo pode ocorrer em vários países e avaliar várias intervenções. No projeto, duas bridges usam o prefixo `gld_flat_`; elas continuam sendo tabelas associativas, e não tabelas completas de todas as medidas do estudo. A terceira flat, `gld_flat_country_year_metrics`, é uma tabela agregada e desnormalizada para consumo por país e ano de início.
+As **bridges** representam relações de muitos para muitos. Um estudo pode ocorrer em vários países e avaliar várias intervenções. No projeto, duas bridges usam o prefixo `gld_flat_`; A terceira flat, `gld_flat_country_year_metrics`, é uma tabela agregada e desnormalizada para consumo por país e ano de início.
 
-O modelo possui cinco dimensões, duas fatos e três flats. As chaves SHA-256 são derivadas deterministicamente dos atributos normalizados; não são sequências numéricas. Não há implementação de histórico SCD nem constraints PK/FK declaradas nos notebooks.
+O modelo possui cinco dimensões, duas fatos e três flats. As chaves SHA-256 são derivadas deterministicamente dos atributos normalizados; não são sequências numéricas. Não há implementação de histórico SCD, será revisto como melhoria ou debito técnico.
 
 ```mermaid
 erDiagram
@@ -179,139 +179,138 @@ erDiagram
     DIM_DATE ||--o{ FAT_COUNTRY_POPULATION : referencia_anual
 ```
 
-### 3.3 Função de cada tabela
+### 3.3 Descrição de cada tabela
 
 #### brz_clinical_trials
 
-**Classe:** Bronze. **Grão:** Um registro clínico por linha da coleta.
+**Classe:** Bronze. **Granularidade:** Um registro clínico por linha da coleta.
 
-Preserva o JSON do estudo e os metadados de ingestão. Permite reprocessar atributos sem repetir a chamada da API enquanto esse snapshot estiver disponível. Alimenta estudos, condições, intervenções e locais. A chave esperada é nct_id no snapshot; duplicatas de origem não são removidas no coletor.
+- Preserva o JSON do estudo e os metadados de ingestão. Permite reprocessar atributos sem repetir a chamada da API enquanto esse snapshot estiver disponível. Alimenta estudos, condições, intervenções e locais. A chave esperada é nct_id; duplicatas de origem não são removidas no coletor.
 
 #### brz_population
 
-**Classe:** Bronze. **Grão:** Uma observação geográfica por ano na coleta.
+**Classe:** Bronze. **Granularidade:** Uma observação geográfica por ano na coleta.
 
-Preserva a observação populacional em JSON com código, ano e origem. Alimenta slv_population. Pode incluir países, territórios e agregados regionais; não é exclusivamente uma lista de países.
+- Preserva a observação populacional em JSON com código, ano e origem. Alimenta slv_population. Pode incluir países, territórios e agregados regionais; não é exclusivamente uma lista de países.
 
 #### slv_studies
 
-**Classe:** Silver. **Grão:** Um estudo por nct_id.
+**Classe:** Silver. **Granularidade:** Um estudo por nct_id.
 
-Estrutura título, tipo, situação, fases, datas, participantes e patrocinador. Conserva datas originais e natureza ACTUAL/ESTIMATED; converte datas parciais e calcula duração. É a base central da fato e da dimensão de estudos.
+- Estrutura título, tipo, situação, fases, datas, participantes e patrocinador. Conserva datas originais e natureza ACTUAL/ESTIMATED; converte datas parciais e calcula duração. É a base central da fato e da dimensão de estudos.
 
 #### slv_conditions
 
-**Classe:** Silver. **Grão:** Par distinto nct_id e condição.
+**Classe:** Silver. **Granularidade:** Par distinto nct_id e condição.
 
-Explode o array de condições, normaliza espaços e remove nomes nulos e duplicatas. Permite investigar o escopo clínico e a presença de múltiplas doenças no mesmo estudo. Não possui tabela derivada Gold no código.
+- Explode o array de condições, normaliza espaços e remove nomes nulos e duplicatas. Permite investigar o escopo clínico e a presença de múltiplas doenças no mesmo estudo. Não possui tabela derivada Gold no código.
 
 #### slv_interventions
 
-**Classe:** Silver. **Grão:** Linha distinta de estudo, tipo, nome e descrição.
+**Classe:** Silver. **Granularidade:** Linha distinta de estudo, tipo, nome e descrição.
 
-Explode intervenções, normaliza tipo/nome e mantém descrição. Como a deduplicação considera a linha inteira, descrições diferentes podem manter mais de uma linha para um mesmo estudo/tipo/nome. Alimenta dimensão e bridge de intervenções.
+- Explode intervenções, normaliza tipo/nome e mantém descrição. Como a deduplicação considera a linha inteira, descrições diferentes podem manter mais de uma linha para um mesmo estudo/tipo/nome. Alimenta dimensão e bridge de intervenções.
 
 #### slv_locations
 
-**Classe:** Silver. **Grão:** Linha distinta de localização dentro do estudo.
+**Classe:** Silver. **Granularidade:** Linha distinta de localização dentro do estudo.
 
-Mantém estabelecimento, cidade, estado, país, latitude e longitude. Descarta países nulos. Um estudo pode ter muitos locais; contagens de linhas não equivalem a contagens de estudos ou hospitais físicos únicos.
+- Mantém estabelecimento, cidade, estado, país, latitude e longitude. Descarta países nulos. Um estudo pode ter muitos locais; contagens de linhas não equivalem a contagens de estudos ou hospitais físicos únicos.
 
 #### slv_locations_iso3
 
-**Classe:** Silver. **Grão:** Localização enriquecida com código geográfico.
+**Classe:** Silver. **Granularidade:** Localização enriquecida com código geográfico.
 
-Faz left join por nome normalizado com referência da população e oito aliases manuais. Preserva locais não mapeados com country_iso3 nulo. Alimenta a dimensão geográfica e a bridge estudo–país.
+- Faz left join por nome normalizado com referência da população e oito aliases manuais. Preserva locais não mapeados com country_iso3 nulo. Alimenta a dimensão geográfica e a bridge estudo–país.
 
 #### slv_population
 
-**Classe:** Silver. **Grão:** Uma entidade geográfica e ano.
+**Classe:** Silver. **Granularidade:** Uma entidade geográfica e ano.
 
-Extrai código, nome, ano e população do payload; tipa valores, exige código de tamanho três e população não nula, e deduplica código/ano. Serve como denominador das taxas. O filtro por tamanho não exclui agregados.
+- Extrai código, nome, ano e população do payload; tipa valores, exige código de tamanho três e população não nula, e deduplica código/ano. Serve como denominador das taxas. O filtro por tamanho não exclui agregados.
 
 #### gld_dim_study
 
-**Classe:** Dimensão. **Grão:** Um estudo por nct_id / study_key.
+**Classe:** Dimensão. **Granularidade:** Um estudo por nct_id / study_key.
 
-Descreve estudo, título, tipo, situação, fase e natureza do enrollment. study_key = SHA-256(nct_id). Usa coalesce para transformar fase nula em NA, perdendo a distinção entre ausência e não aplicabilidade disponível na Silver.
+- Descreve estudo, título, tipo, situação, fase e natureza do enrollment. study_key = SHA-256(nct_id). Usa coalesce para transformar fase nula em NA, perdendo a distinção entre ausência e não aplicabilidade disponível na Silver.
 
 #### gld_dim_sponsor
 
-**Classe:** Dimensão. **Grão:** Uma chave derivada do nome e classe normalizados.
+**Classe:** Dimensão. **Granularidade:** Uma chave derivada do nome e classe normalizados.
 
-Descreve o patrocinador principal. A chave usa lower(trim(nome)), classe normalizada e unknown para classe nula. Suporta rankings por patrocinador. Não representa todos os colaboradores nem montantes de financiamento.
+- Descreve o patrocinador principal. A chave usa lower(trim(nome)), classe normalizada e unknown para classe nula. Suporta rankings por patrocinador. Não representa todos os colaboradores nem montantes de financiamento.
 
 #### gld_dim_country
 
-**Classe:** Dimensão. **Grão:** Um código geográfico / country_key.
+**Classe:** Dimensão. **Granularidade:** Um código geográfico / country_key.
 
-Une códigos de locais mapeados e população. country_key = SHA-256(country_iso3). Mantém um nome via first não ordenado, portanto a escolha entre variantes não é determinística. Os 261 registros são entidades geográficas, não necessariamente 261 países.
+- Une códigos de locais mapeados e população. country_key = SHA-256(country_iso3). Mantém um nome via first não ordenado, portanto a escolha entre variantes não é determinística. Os 261 registros são entidades geográficas, não necessariamente 261 países.
 
 #### gld_dim_intervention
 
-**Classe:** Dimensão. **Grão:** Um par normalizado tipo e nome de intervenção.
+**Classe:** Dimensão. **Granularidade:** Um par normalizado tipo e nome de intervenção.
 
-Descreve intervenções com chave SHA-256 de tipo e nome concatenados. Deduplica variantes de caixa/espaços externos, mas não resolve sinônimos, doses ou nomes comerciais. Permite agrupar tratamentos via bridge.
+- Descreve intervenções com chave SHA-256 de tipo e nome concatenados. Deduplica variantes de caixa/espaços externos, mas não resolve sinônimos, doses ou nomes comerciais. Permite agrupar tratamentos via bridge.
 
 #### gld_dim_date
 
-**Classe:** Dimensão. **Grão:** Uma data civil por date_key.
+**Classe:** Dimensão. **Granularidade:** Uma data civil por date_key.
 
-Gera calendário diário entre menor e maior data clínica, com ano, trimestre, mês, dia e semana. date_key tem formato yyyyMMdd. Relaciona-se à fato clínica em dois papéis: início e conclusão. A fato populacional usa 1º de janeiro; sua cobertura deve ser validada separadamente.
+- Gera calendário diário entre menor e maior data clínica, com ano, trimestre, mês, dia e semana. date_key tem formato yyyyMMdd. Relaciona-se à fato clínica em dois papéis: início e conclusão. A fato populacional usa 1º de janeiro; sua cobertura deve ser validada separadamente.
 
 #### gld_fat_clinical_study
 
-**Classe:** Fato. **Grão:** Uma linha por estudo.
+**Classe:** Fato. **Granularidade:** Uma linha por estudo.
 
-Armazena enrollment_count, duration_days e collected_at, ligados às dimensões por study_key, sponsor_key, start_date_key e completion_date_key. Participantes são do estudo inteiro e podem ser estimados. Não correspondem a pessoas únicas entre estudos. Médias devem informar elegibilidade e nulos.
+- Armazena enrollment_count, duration_days e collected_at, ligados às dimensões por study_key, sponsor_key, start_date_key e completion_date_key. Participantes são do estudo inteiro e podem ser estimados. Não correspondem a pessoas únicas entre estudos. Médias devem informar elegibilidade e nulos.
 
 #### gld_fat_country_population
 
-**Classe:** Fato. **Grão:** Uma entidade geográfica por ano.
+**Classe:** Fato. **Granularidade:** Uma entidade geográfica por ano.
 
-Armazena population, country_key e date_key no formato ano0101. O dia 1º de janeiro é uma convenção da chave anual, não uma afirmação sobre a data da medição. População não deve ser somada entre anos para produzir um estoque populacional; agregados sobrepostos também não podem ser somados como países independentes.
+- Armazena population, country_key e date_key no formato ano0101. O dia 1º de janeiro é uma convenção da chave anual, não uma afirmação sobre a data da medição. População não deve ser somada entre anos para produzir um estoque populacional; agregados sobrepostos também não podem ser somados como países independentes.
 
 #### gld_flat_bridge_study_location
 
-**Classe:** Flat / bridge. **Grão:** Um par study_key e country_key.
+**Classe:** Flat / bridge. **Granularidade:** Um par study_key e country_key.
 
-Relaciona estudos a países mapeados e calcula facility_count por pares distintos de estabelecimento e cidade. Remove ISO3 nulo. O countDistinct de múltiplas colunas não conta pares com nulo; somar facility_count representa participações de locais nos estudos, não estabelecimentos únicos.
+- Relaciona estudos a países mapeados e calcula facility_count por pares distintos de estabelecimento e cidade. Remove ISO3 nulo. O countDistinct de múltiplas colunas não conta pares com nulo; somar facility_count representa participações de locais nos estudos, não estabelecimentos únicos.
 
 #### gld_flat_bridge_study_intervention
 
-**Classe:** Flat / bridge. **Grão:** Um par study_key e intervention_key.
+**Classe:** Flat / bridge. **Granularidade:** Um par study_key e intervention_key.
 
-Relaciona cada estudo às intervenções da dimensão. Deduplica o par de hashes. Viabiliza consultas por tipo/nome sem carregar descrições textuais na fato. Uma intervenção pode aparecer em muitos estudos e um estudo pode ter várias intervenções.
+- Relaciona cada estudo às intervenções da dimensão. Deduplica o par de hashes. Viabiliza consultas por tipo/nome sem carregar descrições textuais na fato. Uma intervenção pode aparecer em muitos estudos e um estudo pode ter várias intervenções.
 
 #### gld_flat_country_year_metrics
 
-**Classe:** Flat agregada. **Grão:** Uma entidade geográfica e ano de início, inclusive ano nulo.
+**Classe:** Flat agregada. **Granularidade:** Uma entidade geográfica e ano de início, inclusive ano nulo.
 
-Combina bridge geográfica, fato clínica, dimensão de países e fato populacional. Calcula study_count, soma facility_count, associa população do mesmo ano e calcula round(study_count / population × 1.000.000, 4). Inclui somente grupos com estudos; não produz uma grade completa de países/anos com zero. Sem população, a taxa é nula.
+- Combina bridge geográfica, fato clínica, dimensão de países e fato populacional. Calcula study_count, soma facility_count, associa população do mesmo ano e calcula round(study_count / population × 1.000.000, 4). Inclui somente grupos com estudos; não produz uma grade completa de países/anos com zero. Sem população, a taxa é nula.
 
 #### sys_data_quality_control
 
-**Classe:** Controle. **Grão:** Uma tabela e coluna na avaliação armazenada.
+**Classe:** Controle. **Granularidade:** Uma tabela e coluna na avaliação armazenada.
 
-Persiste total, não nulos, nulos, percentual de nulos, distintos e extremos. Ajuda a entender cobertura e plausibilidade. A escrita overwrite conserva apenas o resultado corrente; não é um histórico de monitoramento.
+- Persiste total, não nulos, nulos, percentual de nulos, distintos e extremos. Ajuda a entender cobertura e plausibilidade. A escrita overwrite conserva apenas o resultado corrente; não é um histórico de monitoramento.
 
 #### sys_data_quality_results
 
-**Classe:** Controle. **Grão:** Uma regra na avaliação armazenada.
+**Classe:** Controle. **Granularidade:** Uma regra na avaliação armazenada.
 
-Persiste nome, tabela, severidade, quantidade de falhas, passed e timestamp. passed significa contagem igual a zero. A rotina registra resultados e não lança uma falha automática quando uma regra ERROR reprova.
+- Persiste nome, tabela, severidade, quantidade de falhas, passed e timestamp. passed significa contagem igual a zero. A rotina registra resultados e não lança uma falha automática quando uma regra ERROR reprova.
 
 ### Cuidados com joins e agregações
 
-Depois de um join da fato com uma bridge, um estudo pode ocupar várias linhas. Para contar estudos por categoria, usar `COUNT(DISTINCT study_key)`. Não somar participantes após joins geográficos ou de intervenção sem definir uma regra de alocação. Somar estudos por país não produz o total mundial, pois estudos multinacionais participam de vários grupos. Não tirar média simples das taxas por milhão de diferentes países/anos para obter uma taxa global.
+- Depois de um join da fato com uma bridge, um estudo pode ocupar várias linhas. Para contar estudos por categoria, usar `COUNT(DISTINCT study_key)`. Não somar participantes após joins geográficos ou de intervenção sem definir uma regra de alocação. Somar estudos por país não produz o total mundial, pois estudos multinacionais participam de vários grupos. Não tirar média simples das taxas por milhão de diferentes países/anos para obter uma taxa global.
 
 ### 3.4 Dicionário de dados completo
 
-Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformações abaixo descrevem o código enviado. Domínios documentados não equivalem a constraints aplicadas. Os caminhos clínicos estão dentro de `payload.protocolSection`. `json_data` é uma estrutura temporária do parsing.
+- Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformações abaixo descrevem o código. Os caminhos clínicos estão dentro de `payload.protocolSection`. `json_data` é uma estrutura temporária do parsing.
 
 #### 3.4.1 `brz_clinical_trials`
-
-**Grão:** Um registro retornado pela API em uma página da extração corrente.  
+ 
 **Origem/linhagem:** API ClinicalTrials.gov.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -324,8 +323,7 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 | collected_at | TIMESTAMP | Instante lógico da coleta | Timestamp; confirmar fuso da exibição | Configuração da ingestão, preservada da Bronze |
 
 #### 3.4.2 `brz_population`
-
-**Grão:** Um registro de entidade geográfica e ano retornado na extração corrente.  
+ 
 **Origem/linhagem:** API Banco Mundial.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -340,7 +338,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.3 `slv_studies`
 
-**Grão:** Um registro por nct_id.  
 **Origem/linhagem:** brz_clinical_trials; seleção do registro mais recente e extração do JSON.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -366,7 +363,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.4 `slv_conditions`
 
-**Grão:** Par distinto nct_id e condition_name.  
 **Origem/linhagem:** brz_clinical_trials; conditionsModule.conditions[].
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -376,7 +372,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.5 `slv_interventions`
 
-**Grão:** Linha distinta de estudo, tipo, nome e descrição.  
 **Origem/linhagem:** brz_clinical_trials; armsInterventionsModule.interventions[].
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -388,7 +383,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.6 `slv_locations`
 
-**Grão:** Linha distinta dos sete campos de localização, incluindo estudo.  
 **Origem/linhagem:** brz_clinical_trials; explode das localizações; descarte de país nulo.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -403,7 +397,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.7 `slv_locations_iso3`
 
-**Grão:** Linha de localização com código mapeado.  
 **Origem/linhagem:** slv_locations LEFT JOIN referência populacional e overrides por nome normalizado.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -418,8 +411,7 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 | country_iso3 | STRING | Código geográfico de três caracteres | ISO3 esperado; códigos agregados ainda precisam de exclusão | Banco Mundial ou mapeamento por nome |
 
 #### 3.4.8 `slv_population`
-
-**Grão:** Par country_iso3 e year; ainda pode incluir agregados.  
+ 
 **Origem/linhagem:** brz_population; parse, filtros e deduplicação.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -433,7 +425,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.9 `gld_dim_study`
 
-**Grão:** Um registro por estudo.  
 **Origem/linhagem:** slv_studies.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -447,8 +438,7 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 | enrollment_type | STRING | Natureza da quantidade de participantes | ACTUAL, ESTIMATED ou nulo | designModule.enrollmentInfo.type; upper |
 
 #### 3.4.10 `gld_dim_sponsor`
-
-**Grão:** Uma chave por nome/classe normalizados.  
+ 
 **Origem/linhagem:** slv_studies; patrocinador não nulo; deduplicação pela chave.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -458,8 +448,7 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 | sponsor_class | STRING | Classe do patrocinador principal | NIH, FED, OTHER_GOV, INDIV, INDUSTRY, NETWORK, AMBIG, OTHER, UNKNOWN conforme origem | sponsorCollaboratorsModule.leadSponsor.class; upper |
 
 #### 3.4.11 `gld_dim_country`
-
-**Grão:** Uma chave por código geográfico.  
+ 
 **Origem/linhagem:** União de slv_locations_iso3 e slv_population; agrupamento por código/hash.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -470,7 +459,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.12 `gld_dim_intervention`
 
-**Grão:** Uma chave por tipo/nome normalizados.  
 **Origem/linhagem:** slv_interventions; deduplicação pela chave.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -481,7 +469,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.13 `gld_dim_date`
 
-**Grão:** Um dia por linha entre o menor início/fim e o maior início/fim.  
 **Origem/linhagem:** Limites de slv_studies; sequence diária.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -497,7 +484,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.14 `gld_fat_clinical_study`
 
-**Grão:** Uma linha por estudo.  
 **Origem/linhagem:** slv_studies.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -512,7 +498,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.15 `gld_fat_country_population`
 
-**Grão:** Uma linha por entidade e ano.  
 **Origem/linhagem:** slv_population.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -523,7 +508,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.16 `gld_flat_bridge_study_location`
 
-**Grão:** Par study_key e country_key.  
 **Origem/linhagem:** slv_locations_iso3; exclusão de ISO3 nulo; agrupamento por estudo/país.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -534,7 +518,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.17 `gld_flat_bridge_study_intervention`
 
-**Grão:** Par study_key e intervention_key.  
 **Origem/linhagem:** slv_interventions; hashes e dropDuplicates.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -544,7 +527,6 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 #### 3.4.18 `gld_flat_country_year_metrics`
 
-**Grão:** Uma linha por país/entidade e ano de início dos estudos mapeados.  
 **Origem/linhagem:** Bridge de locais + fato clínica + dimensão de país; LEFT JOIN população por país/ano.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -559,8 +541,7 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 | studies_per_million | DOUBLE | Estudos por milhão de habitantes | >= 0 quando denominador > 0; nulo sem população; proteção a zero pendente | round(study_count / population * 1000000,4) |
 
 #### 3.4.19 `sys_data_quality_control`
-
-**Grão:** Uma linha por tabela Silver e coluna perfilada.  
+ 
 **Origem/linhagem:** profile_table em config; seis tabelas Silver.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -577,8 +558,7 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 | maximum_value | STRING | Máximo convertido para texto | Numérico/data no tipo original; lexical para texto | max(coluna).cast(string) |
 
 #### 3.4.20 `sys_data_quality_results`
-
-**Grão:** Uma linha por regra na execução armazenada.  
+  
 **Origem/linhagem:** quality_rules e spark.sql; escrita overwrite.
 
 | Coluna | Tipo | Descrição | Domínio / ressalva | Origem / transformação |
@@ -592,14 +572,15 @@ Todos os nomes pertencem a `mvp_eng_dados.mvp_cancer`. Os tipos e transformaçõ
 
 ### 3.5 Governança
 
-O catálogo textual documenta as 20 tabelas. Não foram anexados comandos que apliquem comentários a todas as colunas nem constraints de integridade. Confirmar os schemas finais no Catalog Explorer. O notebook `estrutura_dos_dados`, citado em versões anteriores, não integra os 11 arquivos desta entrega; a criação inicial de catálogo/schema/volume não pode ser descrita como reexecutada a partir desta remessa.
+O catálogo textual documenta as 20 tabelas. Mostro abaixo a insert de comentários automatizados, mas também segue comentários para cada tabela usando como auxilio a Genie do Databricks. O notebook `estrutura_dos_dados`, foi executado com esse intuito.
 
-> **INSERIR PRINT — E04: Modelagem e catálogo**  
-> Mostrar: linhagem e schemas, com comentários de tabelas e colunas; dividir em imagens legíveis quando necessário.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+**Evidência — E04: Modelagem e Catalogo**
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![E04 — Modelagem e catálogo](docs/evidencias/e04.png) -->
+<![E04 — Modelagem e catalogo](IMAGENS/E04_Modelagem_e_catalogo_1.png) -->
+
+**Evidência — E04: Modelagem e Catalogo**
+
+<![E04 — Modelagem e catalogo](IMAGENS/E04_Modelagem_e_catalogo_2.png) -->
 
 <a id="pipeline"></a>
 ## 4. Pipeline de dados e análise dos notebooks
@@ -608,7 +589,7 @@ O catálogo textual documenta as 20 tabelas. Não foram anexados comandos que ap
 
 #### 4.1.1 `config.dbc`
 
-Centraliza imports, constantes, sessão HTTP, schema clínico e funções auxiliares. `profile_table` calcula métricas por coluna; `create_http_session` configura retry; `parse_partial_date` preenche mês/dia ausentes com 01; `save_gold` padroniza Delta overwrite. Lê a Bronze, escolhe a linha mais recente por nct_id/collected_at e aplica from_json. A definição do schema precede o parsing na ordem real `position`. Como esse notebook lê Bronze, uma primeira carga em ambiente vazio exige separar inicialização de transformação. Um empate de collected_at não tem desempate explícito.
+Centraliza imports, constantes, sessão HTTP, schema clínico e funções auxiliares. Como o `profile_table` que calcula métricas por coluna; `create_http_session` configura retry; `parse_partial_date` preenche mês/dia ausentes com 01; `save_gold` padroniza Delta overwrite para camada gold. Lê a Bronze, escolhe a linha mais recente por nct_id/collected_at e aplica from_json. A definição do schema precede o parsing na ordem real `position`. Como esse notebook lê Bronze, uma primeira carga em ambiente vazio exige separar inicialização de transformação. Um empate de collected_at não tem desempate explícito.
 
 #### 4.1.2 `01_etl_brz_clinical_trials_table.dbc`
 
@@ -652,9 +633,9 @@ Lista as tabelas do projeto, chama config, perfila as seis Silver e grava sys_da
 
 ### 4.2 Job e ordem de execução
 
-**INFORMADO PELO AUTOR:** foi criado e agendado um Job com uma task por notebook de execução. A execução manual e a execução via cluster Job foram concluídas com sucesso. As dependências são organizadas por camada, Bronze → Silver → Gold.
+**Persistência:** foi criado e agendado um Job com uma task por notebook de execução. Tanto a execução manual quanto execução via cluster Job foram concluídas com sucesso. As dependências são organizadas por camada, Bronze → Silver → Gold.
 
-O encadeamento lógico deve garantir também que `slv_locations` e `slv_population` estejam atualizadas antes de `slv_locations_iso3`. O sucesso de config em uma task não deve ser interpretado como inicialização de variáveis Python nas demais: cada notebook chama sua configuração via `%run`.
+O encadeamento lógico deve garantir também que `slv_locations` e `slv_population` estejam atualizadas antes de `slv_locations_iso3`. 
 
 | Estágio | Notebooks | Pré-requisito de dados |
 | --- | --- | --- |
@@ -666,45 +647,25 @@ O encadeamento lógico deve garantir também que `slv_locations` e `slv_populati
 | Gold | 03_etl_gold | Silver concluída, incluindo ISO3 |
 | Controle | 04_qualidade_dados | Silver para regras e Gold para os SELECTs finais; confirmar posição no grafo real |
 
-Não foram recebidos JSON/YAML do Job nem seu histórico. Preencher os valores reais abaixo; não inferir agenda ou nomes de tasks pelos nomes dos notebooks.
-
-| Parâmetro operacional | Registro da entrega |
-| --- | --- |
-| Nome, ID e link do Job | **INSERIR** |
-| Frequência / cron e fuso | **INSERIR** |
-| Estado da agenda | **INSERIR** |
-| Compute / Runtime e Run as | **INSERIR** |
-| Task keys e caminhos | **INSERIR** ou anexar configuração |
-| Condições de dependência, retries e timeout | **INSERIR** |
-| Run ID da rodada final e horários | **INSERIR** |
-| Concorrência máxima / execução sobreposta | **INSERIR** |
 
 ### 4.3 Reprodutibilidade
 
-Importar os notebooks preservando a relação de caminhos de `%run ./config`; confirmar bibliotecas e objetos de destino; executar as coletas, as Silver na ordem lógica, Gold e qualidade. Para reprodução em ambiente vazio, separar do config a leitura da Bronze. Registrar contagens, Run ID, horários e versões das tabelas. Como as fontes mudam, uma nova coleta pode produzir números diferentes dos apresentados.
+`%run ./config` Importa os notebooks preservando a relação de caminhos, confirmar bibliotecas e objetos de destino; executar as coletas, as Silver na ordem lógica, Gold e qualidade. Para reprodução em ambiente vazio, separar do config a leitura da Bronze. Registrar contagens, Run ID, horários e versões das tabelas. Como as fontes mudam, uma nova coleta pode produzir números diferentes dos apresentados.
 
-A análise das células também mostra que a consulta manual de ISO3 ocorreu antes da atualização manual de população nessa exportação. Isso pode ter utilizado uma versão já existente da população; não comprova a ordem do Job. O grafo deve garantir a dependência correta para evitar misturar rodadas.
+> **Evidência — E05: Grafo do Job**  
+> Obs: tasks e dependências entre camadas. 
 
-> **INSERIR PRINT — E05: Grafo do Job**  
-> Mostrar: tasks e dependências entre camadas e dentro da Silver.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+<![E05 — Grafo do Job](IMAGENS/E05_Grafo_do_Job.png) -->
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![E05 — Grafo do Job](docs/evidencias/e05.png) -->
+> **Evidência — E06: Agendamento e compute**  
+> Obs: frequência, fuso, agenda ativa e configuração de cluster ou compute.  
 
-> **INSERIR PRINT — E06: Agendamento e compute**  
-> Mostrar: frequência, fuso, agenda ativa e configuração de cluster ou compute.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+<![E06 — Agendamento e compute](IMAGENS/E06_Agendamento_e_compute.png) -->
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![E06 — Agendamento e compute](docs/evidencias/e06.png) -->
+> **Evidência — E07: Execução manual e via Job**  
+> Obs: Run ID, horários e status de todas as tasks da rodada final, além das validações manuais.  
 
-> **INSERIR PRINT — E07: Execução manual e via Job**  
-> Mostrar: Run ID, horários e status de todas as tasks da rodada final, além das validações manuais.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
-
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![E07 — Execução manual e via Job](docs/evidencias/e07.png) -->
+<![E06 — Execução Manuel e Job](IMAGENS/E07_Execucao_manual_Job.png) -->
 
 ### 4.4 Contagens Gold da nova remessa
 
