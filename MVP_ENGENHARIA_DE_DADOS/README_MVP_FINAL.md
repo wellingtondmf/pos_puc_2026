@@ -808,210 +808,284 @@ Obs: nulos, distintos e extremos com contexto de execução.
 
 ### 6.1 Alcance das respostas
 
-As consultas exportadas completas permitem analisar fases e status da nova extração. O resultado por tipo de intervenção permanece histórico. A flat país–ano foi exportada integralmente (1.871 linhas, sem overflow), permitindo agregações geográficas nesta revisão. Os SELECTs de estudos, fato clínica e bridges estão truncados; não é correto calcular sobre essas prévias médias ou rankings como se representassem toda a base.
+As consultas permitem analisar fases e status das perguntas proposta neste MVP. O resultado por tipo de intervenção permanece histórico completo direto da origem. A flat país–ano foi exportada integralmente (1.871 linhas, sem overflow), permitindo agregações geográficas nesta revisão. Os SELECTs de estudos, fato clínica e bridges estão truncados.
 
 | Pergunta | Situação | Motivo / alcance |
 | --- | --- | --- |
-| 1 — Registro por ano | Sem resposta final | Datas de registro não foram extraídas na Silver; ano de início não é registro |
-| 2 — Distribuição por país | Respondida para geografia mapeada | Agregação da flat completa; locais sem ISO3 ficam fora |
-| 3 — Ranking de países | Respondida para geografia mapeada | Mesma cobertura e limitação da pergunta 2 |
-| 4 — Fases | Resultado disponível com ressalva | COALESCE combina nulo e NA |
-| 5 — Tipos de intervenção | Resultado histórico | Célula de agosto não foi atualizada na exportação |
-| 6 — Tratamentos / medicamentos | Sem resposta final | Bridge e dimensão de intervenções truncadas no export; falta consulta agregada completa |
-| 7 — Situação | Respondida | Resultado agregado atualizado |
-| 8 — Duração média | Sem resposta final | Falta agregado completo e definição de elegibilidade das datas |
-| 9 — Participantes por fase | Sem resposta final | Falta agregado completo; separar ACTUAL/ESTIMATED |
-| 10 — Patrocinadores | Sem resposta final | Dimensão completa não informa frequência; fato/estudos estão truncados |
-| 11 — Fase, participantes e duração | Sem resposta final | Falta análise estratificada e tratamento dos extremos |
-| 12 — Brasil | Comparação descritiva parcial | Ranking e indicador de 2025 da flat; sem conclusão causal ou de acesso |
+| 1 — Registro por ano | Respondida | A quantidade de registro por ano aumenta a cada ano. Precisa de melhoria na tabela para camada gold |
+| 2 — Ranking de países | Respondida para geografia mapeada | Mesma cobertura e limitação da pergunta 2 |
+| 3 — Fases | Resultado disponível com ressalva | COALESCE combina nulo e NA |
+| 4 — Tipos de intervenção | Resultado histórico | Célula de agosto não foi atualizada na exportação |
+| 5 — Tratamentos / medicamentos | Sem resposta final | Bridge e dimensão de intervenções truncadas no export; falta consulta agregada completa |
+| 6 — Situação | Respondida | Resultado agregado atualizado |
+| 7 — Participantes por fase | Sem resposta final | Falta agregado completo; separar ACTUAL/ESTIMATED |
+| 8 — Patrocinadores | Sem resposta final | Dimensão completa não informa frequência; fato/estudos estão truncados |
+| 9 — Fase, participantes e duração | Sem resposta final | Falta análise estratificada e tratamento dos extremos |
+| 10 — Brasil | Comparação descritiva parcial | Ranking e indicador de 2025 da flat; sem conclusão causal ou de acesso |
 
-### 6.2 Distribuição geográfica e países com mais estudos — perguntas 2 e 3
+### 6.1.1 Quantidade de registro de estudos feito por ano — Perguntas 1
 
-**CALCULADO NESTA REVISÃO:** soma de study_count por país em todos os grupos da flat exportada, incluindo o grupo de ano nulo. Pelo grão do modelo, cada estudo tem um único ano de início e um par estudo–país na bridge; portanto a soma entre anos representa a contagem por país, condicionada à unicidade prevista no código. Não é soma mundial de estudos exclusivos.
+**Analise sobre a pergunta:**A ideia desta pergunta foi encontrar se a quantidade de registro de estudos por ano, se mantem ao longo dos anos ou não. Para usar esse parametro futuramente, e entender se mais ou menos estudos ajudam a melhorar a qualidade da solução na luta contra o cancer.
 
-| Posição | Código | Nome na dimensão | Estudos |
-| --- | --- | --- | --- |
-| 1 | USA | United States | 7.047 |
-| 2 | CHN | China | 2.203 |
-| 3 | FRA | France | 1.384 |
-| 4 | ESP | Spain | 1.071 |
-| 5 | CAN | Canada | 1.033 |
-| 6 | ITA | Italy | 1.024 |
-| 7 | GBR | United Kingdom | 874 |
-| 8 | DEU | Germany | 774 |
-| 9 | KOR | South Korea | 717 |
-| 10 | BEL | Belgium | 638 |
-| 11 | AUS | Australia | 492 |
-| 12 | NLD | Netherlands | 453 |
-| 13 | TWN | Taiwan | 449 |
-| 14 | BRA | Brazil | 385 |
-| 15 | JPN | Japan | 326 |
+```SQL
+WITH ultima_versao AS (SELECT nct_id,
+                              payload,
+                              ROW_NUMBER() OVER (PARTITION BY nct_id ORDER BY collected_at DESC, page_number DESC) AS rn
+                         FROM mvp_eng_dados.mvp_cancer.brz_clinical_trials),
+
+         registros AS (SELECT nct_id,
+                              TRY_CAST(get_json_object(payload,'$.protocolSection.statusModule.studyFirstPostDateStruct.date') AS DATE) AS data_primeira_publicacao
+                         FROM ultima_versao
+                        WHERE rn = 1)
+                        
+SELECT YEAR(data_primeira_publicacao) AS ano_registro,
+       COUNT(DISTINCT nct_id) AS quantidade_estudos
+  FROM registros
+ GROUP BY YEAR(data_primeira_publicacao)
+ ORDER BY ano_registro NULLS LAST;
+```
+> **Evidência — Q01: Quantidade de estudos por ano**  
+> Obs: Conta a quantidade de registro por data da primeira puplicação do estudo.  
+<![Q01 — Quantidade de estudos por ano](IMAGENS/Q01_Quantidade_estudos_ano.png) -->
+
+---
+### 6.1.2 Países com mais estudos  — Perguntas 2
+
+**Analise sobre a pergunta:** Soma de study_count por país em todos os grupos da flat exportada sem data filtro apenas um valor total, incluindo o grupo de ano nulo. Pela granularidade do modelo, cada estudo tem um único ano de início e um par estudo–país na bridge; portanto a soma entre anos representa a contagem por país, condicionada à unicidade prevista no código. Não é soma mundial de estudos exclusivos
+
+```sql
+WITH estudos_por_pais AS (SELECT c.country_iso3,
+                                 c.country_name,
+                                 COUNT(DISTINCT b.study_key) AS quantidade_estudos
+                            FROM mvp_eng_dados.mvp_cancer.gld_flat_bridge_study_location b
+                            JOIN mvp_eng_dados.mvp_cancer.gld_dim_country c
+                                ON b.country_key = c.country_key
+                            GROUP BY c.country_iso3, c.country_name)
+
+SELECT DENSE_RANK() OVER (ORDER BY quantidade_estudos DESC) AS posicao,
+       country_iso3 AS codigo_iso3,
+       country_name AS pais,
+       quantidade_estudos
+  FROM estudos_por_pais
+ ORDER BY posicao, pais;
+```
+> **Evidência — Q02: Ranking dos Paises**  
+> Obs: consulta de países com contagem distinta e cobertura do mapeamento.
+
+![Q02 — Ranking dos Paises](IMAGENS/Q02_Ranking_dos_paises.png) -->
 
 Os Estados Unidos concentram 7.047 estudos com geografia mapeada, seguidos de China (2.203) e França (1.384). O ranking descreve presença de locais dos estudos nesses países, não nacionalidade do patrocinador nem pacientes únicos. A cobertura incompleta do ISO3 limita a comparação.
 
-Consulta equivalente para reprodução no Databricks, não executada nesta revisão:
+---
 
-```sql
-SELECT country_iso3, country_name, SUM(study_count) AS studies
-  FROM mvp_eng_dados.mvp_cancer.gld_flat_country_year_metrics
-GROUP BY country_iso3, country_name
-ORDER BY studies DESC, country_iso3;
+### 6.1.3 Fases clínicas — Pergunta 3
+**Analise sobre a pergunta:** O grupo NA reúne 8.635 estudos e mistura valores NA explícitos com 3.705 fases nulas. A diferença de 4.930 é uma conciliação entre saídas, condicionada à mesma versão da base. Entre fases nomeadas isoladas, PHASE2 é a mais frequente, com 3.555. As categorias combinadas foram preservadas,e não devem ser distribuídas entre fases sem definir uma regra.
+
+```
+WITH base AS (SELECT nct_id,
+                     COALESCE(NULLIF(TRIM(phase), ''), 'NA') AS fase
+                FROM mvp_eng_dados.mvp_cancer.slv_studies)
+
+SELECT fase,
+       COUNT(DISTINCT nct_id) AS quantidade_estudos,
+       ROUND(100.0 * COUNT(DISTINCT nct_id) / SUM(COUNT(DISTINCT nct_id)) OVER (), 2) AS percentual
+  FROM base
+ GROUP BY fase
+ ORDER BY quantidade_estudos DESC;
 ```
 
-> **INSERIR PRINT — Q02: Distribuição geográfica**  
-> Mostrar: consulta de países com contagem distinta e cobertura do mapeamento.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+> **Evidência — Q03: Fases** 
+> Obs: Consulta separando fase nula de NA e identificando o tipo de estudo.
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q02 — Distribuição geográfica](docs/evidencias/q02.png) -->
+![Q03 — Fases](IMAGENS/Q03_Fases.png) -->
 
-> **INSERIR PRINT — Q03: Ranking geográfico**  
-> Mostrar: ranking e filtros utilizados; separar contagem por país de total mundial.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+---
+### 6.1.4 Tipos de intervenção — Pergunta 4
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q03 — Ranking geográfico](docs/evidencias/q03.png) -->
+**Analise sobre a pergunta:** DRUG lidera essa saída histórica, com 7.699 estudos. Um estudo pode aparecer em vários tipos, e a soma das categorias não equivale ao total de estudos. Para a base atual, o perfil atual registra 15.348 estudos distintos em slv_interventions, mas não fornece sua distribuição completa por tipo.
 
-### 6.3 Fases clínicas — pergunta 4
+```
+SELECT intervention_type AS tipo_intervencao,
+       COUNT(DISTINCT nct_id) AS quantidade_estudos
+   FROM mvp_eng_dados.mvp_cancer.slv_interventions
+  GROUP BY intervention_type
+  ORDER BY quantidade_estudos DESC;
+```
 
-Saída atual da consulta `GROUP BY COALESCE(phase, 'NA')`:
+> **Evidência — Q04: Tipos de intervenção**  
+> Obs: Consulta agregada reexecutada para a mesma rodada da entrega.  
+![Q04 — Tipos de intervenção](IMAGENS/Q04_Tipos_de_intervencao.png) -->
 
-| Fase agrupada | Estudos |
-| --- | --- |
-| NA | 8.635 |
-| PHASE2 | 3.555 |
-| PHASE1 | 1.631 |
-| PHASE3 | 1.409 |
-| PHASE1\|PHASE2 | 876 |
-| PHASE4 | 344 |
-| EARLY_PHASE1 | 232 |
-| PHASE2\|PHASE3 | 147 |
+### 6.1.5 Tratamentos e medicamentos — Pergunta 5
 
-O grupo NA reúne 8.635 estudos e mistura valores NA explícitos com 3.705 fases nulas. A diferença de 4.930 é uma conciliação entre saídas, condicionada à mesma versão da base. Entre fases nomeadas isoladas, PHASE2 é a mais frequente, com 3.555. As categorias combinadas foram preservadas; não devem ser distribuídas entre fases sem definir uma regra.
+**Analise sobre a pergunta:** O medicamento mais utilizado segundo a analise e a base é o Paclitaxel. Send um medicamento quimioterápico usado no tratamento de vários tipos de câncer, é possivel que talvez seja um dos mais eficazes. Mas ainda falta bases mais detalhadas.
 
-> **INSERIR PRINT — Q04: Fases**  
-> Mostrar: consulta separando fase nula de NA e identificando o tipo de estudo.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+```
+SELECT d.intervention_type AS tipo_intervencao,
+       d.intervention_name AS intervencao,
+       COUNT(DISTINCT b.study_key) AS quantidade_estudos
+FROM mvp_eng_dados.mvp_cancer.gld_flat_bridge_study_intervention b
+JOIN mvp_eng_dados.mvp_cancer.gld_dim_intervention d
+    ON b.intervention_key = d.intervention_key
+GROUP BY
+    d.intervention_type,
+    d.intervention_name
+ORDER BY quantidade_estudos DESC, intervencao
+```
+> **Evidência — Q05: Tratamentos e medicamentos**  
+> Obs: A Consulta agrupa a as inverveções por quantiade de estudos e tipo de medicamento ou tratamento utilizado.
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q04 — Fases](docs/evidencias/q04.png) -->
+![Q05 — Tratamentos e medicamentos](IMAGENS/Q05_Tratamentos_medicamentos.png) -->
 
-### 6.4 Tipos de intervenção — pergunta 5
+---
+### 6.1.6 Situação — Pergunta 6
 
-**RESULTADO HISTÓRICO DE 31/08/2026:** a saída abaixo está no novo anexo, mas sua célula não foi atualizada. Não descrevê-la como resultado dos 16.829 estudos atuais.
+**Analise sobre a pergunta:** COMPLETED representa 45,76% (7.701 estudos); RECRUITING reúne 2.448 (14,55%). UNKNOWN representa 14,80% (2.491), limitando a interpretação da atividade operacional. COMPLETED significa conclusão do estudo, não eficácia ou sucesso terapêutico. A soma dos percentuais pode diferir de 100% por arredondamento.
 
-| Tipo | Estudos distintos na saída histórica |
-| --- | --- |
-| DRUG | 7.699 |
-| OTHER | 3.236 |
-| PROCEDURE | 2.103 |
-| BEHAVIORAL | 1.631 |
-| DEVICE | 1.193 |
-| BIOLOGICAL | 974 |
-| RADIATION | 916 |
-| DIAGNOSTIC_TEST | 513 |
-| DIETARY_SUPPLEMENT | 220 |
-| GENETIC | 192 |
-| COMBINATION_PRODUCT | 86 |
+```
+SELECT overall_status AS situacao,
+       COUNT(DISTINCT nct_id) AS quantidade_estudos,
+       ROUND(100.0 * COUNT(DISTINCT nct_id) / SUM(COUNT(DISTINCT nct_id)) OVER (), 2) AS percentual
+  FROM mvp_eng_dados.mvp_cancer.slv_studies
+ GROUP BY overall_status
+ ORDER BY quantidade_estudos DESC;
+```
 
-DRUG lidera essa saída histórica, com 7.699 estudos. Um estudo pode aparecer em vários tipos, e a soma das categorias não equivale ao total de estudos. Para a base atual, reexecutar a consulta agregada; o perfil atual registra 15.348 estudos distintos em slv_interventions, mas não fornece sua distribuição completa por tipo.
+> **Evidência — Q06: Situação**  
+> Obs: A consulta mostra como os estudos se distribuem por situação.
 
-> **INSERIR PRINT — Q05: Tipos de intervenção**  
-> Mostrar: consulta agregada reexecutada para a mesma rodada da entrega.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+![Q06 — Situação](IMAGENS/Q06_Situacao.png) -->
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q05 — Tipos de intervenção](docs/evidencias/q05.png) -->
+---
+### 6.1.7 Participantes por fases — pergunta 7
 
-### 6.5 Situação dos estudos — pergunta 7
+**Analise sobre a pergunta:** A média dos Participantes por fases ignora valores nulos. Por isso, estudos_com_participantes informa o denominador efetivo.
 
-Resultado agregado com metadados de 21/09/2026:
+```
+SELECT
+    COALESCE(NULLIF(TRIM(phase), ''), 'NA') AS fase,
+    study_type AS tipo_estudo,
+    COALESCE(enrollment_type, 'NA') AS tipo_contagem,
+    COUNT(*) AS quantidade_estudos,
+    COUNT(enrollment_count) AS estudos_com_participantes,
+    ROUND(AVG(enrollment_count), 2) AS media_participantes,
+    percentile_approx(enrollment_count, 0.5) AS mediana_participantes
+FROM mvp_eng_dados.mvp_cancer.slv_studies
+WHERE COALESCE(enrollment_type, 'NA') <> 'NA'
+GROUP BY COALESCE(NULLIF(TRIM(phase), ''), 'NA'),
+         study_type,
+         COALESCE(enrollment_type, 'NA')
+ORDER BY fase, tipo_estudo, tipo_contagem;
+```
 
-| Situação | Estudos | Percentual (%) |
-| --- | --- | --- |
-| COMPLETED | 7.701 | 45,76 |
-| UNKNOWN | 2.491 | 14,8 |
-| RECRUITING | 2.448 | 14,55 |
-| TERMINATED | 1.430 | 8,5 |
-| ACTIVE_NOT_RECRUITING | 1.210 | 7,19 |
-| NOT_YET_RECRUITING | 820 | 4,87 |
-| WITHDRAWN | 532 | 3,16 |
-| ENROLLING_BY_INVITATION | 103 | 0,61 |
-| SUSPENDED | 62 | 0,37 |
-| NO_LONGER_AVAILABLE | 13 | 0,08 |
-| APPROVED_FOR_MARKETING | 10 | 0,06 |
-| AVAILABLE | 8 | 0,05 |
-| TEMPORARILY_NOT_AVAILABLE | 1 | 0,01 |
+> **Evidência — Q07: Participantes por fases**  
+> Obs: Separa tipo de estudo e natureza da quantidade de participantes, evitando misturar valores ACTUAL e ESTIMATED.
 
-COMPLETED representa 45,76% (7.701 estudos); RECRUITING reúne 2.448 (14,55%). UNKNOWN representa 14,80% (2.491), limitando a interpretação da atividade operacional. COMPLETED significa conclusão do estudo, não eficácia ou sucesso terapêutico. A soma dos percentuais pode diferir de 100% por arredondamento.
+![Q07 — Participantes por fases](IMAGENS/Q07_Participantes_por_fases.png) -->
 
-> **INSERIR PRINT — Q07: Situação dos estudos**  
-> Mostrar: SQL e resultado completo com percentuais e data da base.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+---
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q07 — Situação dos estudos](docs/evidencias/q07.png) -->
+### 6.1.8 Patrocinadores — pergunta 8
 
-### 6.6 Brasil — pergunta 12
+**Analise sobre a pergunta:** A classe dos patrocinadores aparentimente é predominante industrial, sendo dificil analisar outros setores incluino governamentais. Esse fato não parece ser incomum devido ao ser o maiores interessados em si. 
 
-**CALCULADO NESTA REVISÃO:** o Brasil aparece com 385 estudos na soma dos grupos da flat, em 14º lugar por contagem entre os códigos representados na tabela. Essa é uma comparação descritiva da cobertura mapeada.
+```
+SELECT d.sponsor_name AS patrocinador,
+       d.sponsor_class AS categoria_patrocinador,
+       COUNT(DISTINCT f.study_key) AS quantidade_estudos
+  FROM mvp_eng_dados.mvp_cancer.gld_fat_clinical_study f
+  JOIN mvp_eng_dados.mvp_cancer.gld_dim_sponsor d
+    ON f.sponsor_key = d.sponsor_key
+ GROUP BY d.sponsor_key,
+          d.sponsor_name,
+          d.sponsor_class
+ ORDER BY quantidade_estudos DESC, 
+          patrocinador
+```
 
-Para o ano de início de 2025, a flat contém 26 estudos associados ao Brasil e população de 212.812.405, produzindo 0,1222 estudo por milhão. O valor de facility_count é 164 e representa a soma das participações de pares estabelecimento/cidade nos estudos desse grupo. Não representa 164 hospitais únicos nem número de participantes.
+> **Evidência — Q08: Patrocinadores**  
+> Obs: Representa o patrocinador principal, sem medir valores financeiros ou todos os colaboradores.
+
+![Q08 — Patrocinadores](IMAGENS/Q08_Patrocinadores.png) -->
+
+---
+
+### 6.1.9 Fase, participantes e duração — pergunta 9
+
+**Analise sobre a pergunta:** Correlação próxima de 1 indica associação positiva; próxima de −1, negativa; próxima de 0, pouca associação linear. Grupos constantes podem produzir correlação indefinida. O mínimo de três registros apenas evita grupos muito pequenos; não garante robustez estatística. A consulta é exploratória e não demonstra causalidade.
+
+```
+WITH estudos_elegiveis AS ( SELECT COALESCE(NULLIF(TRIM(phase), ''), 'SEM_INFORMACAO') AS fase,
+                                   enrollment_count,
+                                   duration_days
+                              FROM mvp_eng_dados.mvp_cancer.slv_studies
+                             WHERE study_type = 'INTERVENTIONAL'
+                               AND overall_status = 'COMPLETED'
+                               AND enrollment_type = 'ACTUAL'
+                               AND start_date_type = 'ACTUAL'
+                               AND completion_date_type = 'ACTUAL'
+                               AND LENGTH(start_date_original) = 10
+                               AND LENGTH(completion_date_original) = 10
+                               AND enrollment_count IS NOT NULL
+                               AND duration_days IS NOT NULL)
+
+SELECT fase,
+       COUNT(*) AS estudos_elegiveis,
+       ROUND(AVG(enrollment_count), 2) AS media_participantes,
+       percentile_approx(enrollment_count, 0.5) AS mediana_participantes,
+       ROUND(AVG(duration_days), 2) AS media_duracao_dias,
+       percentile_approx(duration_days, 0.5) AS mediana_duracao_dias,
+       ROUND(CORR(enrollment_count, duration_days),4) AS correlacao_participantes_duracao
+  FROM estudos_elegiveis
+ GROUP BY fase
+HAVING COUNT(*) >= 3
+ ORDER BY fase;
+```
+
+> **Evidência — Q09: Fase, participantes e duração**  
+> Obs: A consulta compara os grupos de fase e calcula a correlação de Pearson entre participantes e duração dentro de cada grupo. Essa é a medida retornada por CORR no Databricks.
+
+![Q09 — Fase, participantes e duração](IMAGENS/Q09_Fase_participantes_duracao.png) -->
+---
+
+### 6.1.10 Brasil — Pergunta 10
+
+**Analise sobre a pergunta:** o Brasil aparece com 385 estudos na soma dos grupos da flat, em 14º lugar por contagem entre os códigos representados na tabela. Essa é uma comparação descritiva da cobertura mapeada. Para o ano de início de 2025, a flat contém 26 estudos associados ao Brasil e população de 212.812.405, produzindo 0,1222 estudo por milhão. O valor de facility_count é 164 e representa a soma das participações de pares estabelecimento/cidade nos estudos desse grupo. Não representa 164 hospitais únicos nem número de participantes.
 
 A taxa usa população total e ano de início. Não mede incidência de câncer, oferta de tratamento nem probabilidade individual de acesso. Países sem denominador no mesmo ano não devem ser comparados usando taxa zero.
 
-> **INSERIR PRINT — Q12: Brasil e comparação internacional**  
-> Mostrar: ranking absoluto e taxas para um ano comum com denominadores válidos.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+```
+WITH parametros AS (SELECT 2025 AS ano_referencia),
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q12 — Brasil e comparação internacional](docs/evidencias/q12.png) -->
+base AS (SELECT m.year,
+                m.country_iso3,
+                m.country_name,
+                m.study_count,
+                m.population,
+                CASE WHEN m.population > 0 THEN 1000000.0 * m.study_count / m.population END AS estudos_por_milhao
+           FROM mvp_eng_dados.mvp_cancer.gld_flat_country_year_metrics m
+     CROSS JOIN parametros p
+          WHERE m.year = p.ano_referencia)
 
-### 6.7 Perguntas sem resposta numérica conclusiva
+SELECT year AS ano_inicio,
+    country_iso3 AS codigo_iso3,
+    country_name AS pais,
+    CASE WHEN country_iso3 = 'BRA' THEN 'BRASIL' ELSE 'OUTROS PAISES' END AS identificacao,
+    study_count AS quantidade_estudos,
+    population AS populacao,
+    ROUND(estudos_por_milhao, 4) AS estudos_por_milhao,
+    DENSE_RANK() OVER (ORDER BY study_count DESC) AS ranking_quantidade,
+    CASE WHEN estudos_por_milhao IS NOT NULL THEN DENSE_RANK() OVER (ORDER BY estudos_por_milhao DESC NULLS LAST) END AS ranking_por_milhao
+FROM base
+ORDER BY ranking_quantidade, pais;
+```
 
-As perguntas 1, 6, 8, 9, 10 e 11 permanecem explicitamente no escopo. As saídas truncadas não permitem produzir resultados integrais confiáveis. A pergunta 1 exige extrair a data de registro/publicação e decidir seu significado; as perguntas de duração e participantes exigem distinguir valores efetivos de estimados e datas imputadas. As consultas da seção 9 viabilizam a continuidade sem inventar resultados.
+> **Evidência — Q10: Brasil e comparação internacional**  
+> Obs: ranking absoluto e taxas para um ano comum com denominadores válidos.  
 
-> **INSERIR PRINT — Q01: Registros por ano**  
-> Mostrar: consulta, resultado completo, critérios de elegibilidade e interpretação; se não realizada, explicar a limitação.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
+![Q10 — Brasil](IMAGENS/Q10_Brasil_comparacao_internacional.png) -->
 
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q01 — Registros por ano](docs/evidencias/q01.png) -->
-
-> **INSERIR PRINT — Q06: Tratamentos e medicamentos**  
-> Mostrar: consulta, resultado completo, critérios de elegibilidade e interpretação; se não realizada, explicar a limitação.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
-
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q06 — Tratamentos e medicamentos](docs/evidencias/q06.png) -->
-
-> **INSERIR PRINT — Q08: Duração dos estudos**  
-> Mostrar: consulta, resultado completo, critérios de elegibilidade e interpretação; se não realizada, explicar a limitação.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
-
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q08 — Duração dos estudos](docs/evidencias/q08.png) -->
-
-> **INSERIR PRINT — Q09: Participantes por fase**  
-> Mostrar: consulta, resultado completo, critérios de elegibilidade e interpretação; se não realizada, explicar a limitação.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
-
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q09 — Participantes por fase](docs/evidencias/q09.png) -->
-
-> **INSERIR PRINT — Q10: Patrocinadores**  
-> Mostrar: consulta, resultado completo, critérios de elegibilidade e interpretação; se não realizada, explicar a limitação.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
-
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q10 — Patrocinadores](docs/evidencias/q10.png) -->
-
-> **INSERIR PRINT — Q11: Fase, participantes e duração**  
-> Mostrar: consulta, resultado completo, critérios de elegibilidade e interpretação; se não realizada, explicar a limitação.  
-> Legenda a preencher: data/hora/fuso, notebook ou task, Run ID e resultado observado.
-
-<!-- Remover os marcadores de comentário quando o arquivo existir. -->
-<!-- ![Q11 — Fase, participantes e duração](docs/evidencias/q11.png) -->
+---
 
 <a id="autoavaliacao"></a>
 ## 7. Autoavaliação
@@ -1039,18 +1113,6 @@ Separar config de leitura de dados; preservar snapshots e histórico de qualidad
 <a id="evidencias"></a>
 ## 8. Evidências, pontos de revisão e limites da entrega
 
-### 8.1 Como anexar os prints
-
-Colocar este arquivo como README na pasta do MVP e salvar as imagens em `docs/evidencias/`, relativo a ele. Cada espaço contém uma linha de imagem comentada. Quando o print existir, retirar `<!--` e `-->`, inserir a legenda e manter data/fuso, consulta ou task e Run ID. Dividir imagens extensas em sufixos como e04-01.png e e04-02.png.
-
-```markdown
-![E07 — Execução manual e via Job](docs/evidencias/e07.png)
-
-Legenda: Job [nome], Run ID [id], execução em [data/hora/fuso].
-Resultado: [estado das tasks e validações correspondentes].
-```
-
-As imagens complementam as tabelas e interpretações. Não expor credenciais ou tokens. Versionar as imagens junto ao Markdown para manter os caminhos funcionais.
 
 ### 8.2 O que não foi confirmado e por quê
 
@@ -1103,206 +1165,54 @@ As imagens complementam as tabelas e interpretações. Não expor credenciais ou
 ### 8.5 Índice dos espaços de evidência
 | Código | Conteúdo | Caminho sugerido |
 | --- | --- | --- |
-| E01 | Ambiente e armazenamento | `MVP_ENGENHARIA_DE_DADOS/01_etl_brz_clinical_trials_table` |
-| E02 | Conciliação clínica | `MVP_ENGENHARIA_DE_DADOS/01_etl_brz_world_bank_open_data` |
-| E03 | Coleta populacional | `docs/evidencias/e03.png` |
-| E04 | Modelagem e catálogo | `docs/evidencias/e04.png` |
-| E05 | Grafo do Job | `docs/evidencias/e05.png` |
-| E06 | Agendamento e compute | `docs/evidencias/e06.png` |
-| E07 | Execução manual e via Job | `docs/evidencias/e07.png` |
-| E08 | Persistência e validação Gold | `docs/evidencias/e08.png` |
-| E09 | Perfil Silver | `docs/evidencias/e09.png` |
-| E10 | Regras de qualidade | `docs/evidencias/e10.png` |
-| E11 | Tratamento das exceções | `docs/evidencias/e11.png` |
-| Q02 | Distribuição geográfica | `docs/evidencias/q02.png` |
-| Q03 | Ranking geográfico | `docs/evidencias/q03.png` |
-| Q04 | Fases | `docs/evidencias/q04.png` |
-| Q05 | Tipos de intervenção | `docs/evidencias/q05.png` |
-| Q07 | Situação dos estudos | `docs/evidencias/q07.png` |
-| Q12 | Brasil e comparação internacional | `docs/evidencias/q12.png` |
-| Q01 | Registros por ano | `docs/evidencias/q01.png` |
-| Q06 | Tratamentos e medicamentos | `docs/evidencias/q06.png` |
-| Q08 | Duração dos estudos | `docs/evidencias/q08.png` |
-| Q09 | Participantes por fase | `docs/evidencias/q09.png` |
-| Q10 | Patrocinadores | `docs/evidencias/q10.png` |
-| Q11 | Fase, participantes e duração | `docs/evidencias/q11.png` |
+| E01 | Ambiente e armazenamento | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/E01_Ambiente e armazenamento.png` |
+| E02 | Conciliação clínica | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/E02_Conciliacao_clinica.png` |
+| E03 | Coleta populacional | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/E03_Coleta_populacional.png` |
+| E04 | Modelagem e catálogo | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/E04_Modelagem_e_catalogo_1.png` |
+| E05 | Grafo do Job | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/E05_Grafo_do_Job.png` |
+| E06 | Agendamento e compute | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/E06_Agendamento_e_compute.png` |
+| E07 | Execução manual e via Job | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/E07_Execucao_manual_Job.png` |
+| E08 | Persistência e validação Gold | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/E08_Persistência_validação_Gold.png` |
+| E09 | Perfil Silver | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/E09_Perfil_Silver.png` |
+| E10 | Regras de qualidade | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/E10_Regras_de_qualidade.png` |
+| E11 | Tratamento das exceções | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/E11_Análise_das_ocorrencias_de_qualidade.png` |
+| Q01 | Registros por ano | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/Q01_Quantidade_estudos_ano.png` |
+| Q02 | Ranking geográfico  | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/Q02_Ranking_dos_paises.png` |
+| Q03 | Fases | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/Q03_Fases.png` |
+| Q04 | Tipos de intervenção | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/Q04_Tipos_de_intervencao.png` |
+| Q05 | Tratamentos e medicamentos | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/Q05_Tratamentos_medicamentos.png` |
+| Q06 | Situação dos estudos | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/Q06_Situacao.png` |
+| Q07 | Participantes por fase | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/Q07_Participantes_por_fases.png` |
+| Q08 | Patrocinadores | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/Q08_Patrocinadores.png` |
+| Q09 | Fase, participantes e duração | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/Q09_Fase_participantes_duracao.png` |
+| Q10 | Brasil e comparação internacional | `MVP_ENGENHARIA_DE_DADOS/IMAGENS/Q10_Brasil_comparacao_internacional.png` |
 
-<a id="consultas"></a>
-## 9. Consultas complementares — propostas, não executadas
+## 9. Referências e rastreabilidade
 
-As consultas abaixo usam as tabelas descritas e devem ser executadas na rodada escolhida para a entrega. Não possuem resultados presumidos neste documento.
+### 9.1 Fontes
 
-### 9.1 Registro por ano — definição proposta: primeira publicação
-
-`studyFirstPostDateStruct.date` representa primeira publicação. Se o objetivo for primeiro envio, usar `studyFirstSubmitDate` e nomear a métrica de acordo. A consulta abaixo é um caminho de análise do payload; a implementação final deve persistir o campo escolhido na Silver e avaliar ausências.
-
-```sql
-WITH latest AS (
-  SELECT payload,
-         ROW_NUMBER() OVER (PARTITION BY nct_id ORDER BY collected_at DESC) AS rn
-  FROM mvp_eng_dados.mvp_cancer.brz_clinical_trials
-), extracted AS (
-  SELECT get_json_object(payload,
-    '$.protocolSection.statusModule.studyFirstPostDateStruct.date') AS first_post
-  FROM latest WHERE rn = 1
-)
-SELECT TRY_CAST(SUBSTRING(first_post, 1, 4) AS INT) AS first_post_year,
-       COUNT(*) AS studies
-FROM extracted
-GROUP BY TRY_CAST(SUBSTRING(first_post, 1, 4) AS INT)
-ORDER BY first_post_year;
-```
-
-### 9.2 Tipos e tratamentos mais frequentes
-
-```sql
-SELECT intervention_type, COUNT(DISTINCT nct_id) AS studies
-FROM mvp_eng_dados.mvp_cancer.slv_interventions
-GROUP BY intervention_type ORDER BY studies DESC;
-
-SELECT d.intervention_type, d.intervention_name,
-       COUNT(DISTINCT b.study_key) AS studies
-FROM mvp_eng_dados.mvp_cancer.gld_flat_bridge_study_intervention b
-JOIN mvp_eng_dados.mvp_cancer.gld_dim_intervention d
-  ON b.intervention_key = d.intervention_key
-GROUP BY d.intervention_type, d.intervention_name
-ORDER BY studies DESC LIMIT 20;
-```
-
-O segundo resultado lista nomes cadastrais. Para restringir a medicamentos, explicitar a seleção de tipos e a política de sinônimos; não equiparar automaticamente qualquer intervenção a medicamento.
-
-### 9.3 Duração — coorte restrita para análise inicial
-
-```sql
-SELECT COUNT(*) AS eligible_studies,
-       AVG(duration_days) AS mean_days,
-       percentile_approx(duration_days, 0.5) AS median_days,
-       MIN(duration_days) AS min_days, MAX(duration_days) AS max_days
-FROM mvp_eng_dados.mvp_cancer.slv_studies
-WHERE overall_status = 'COMPLETED'
-  AND start_date_type = 'ACTUAL' AND completion_date_type = 'ACTUAL'
-  AND LENGTH(start_date_original) = 10
-  AND LENGTH(completion_date_original) = 10
-  AND duration_days IS NOT NULL;
-```
-
-Essa coorte exclui datas imputadas e estimadas. Não é a média de todos os estudos; registrar quantos ficaram de fora e inspecionar extremos antes de concluir.
-
-### 9.4 Participantes por fase
-
-```sql
-SELECT COALESCE(phase, 'SEM_INFORMACAO') AS phase,
-       study_type, enrollment_type, COUNT(*) AS studies,
-       COUNT(enrollment_count) AS with_enrollment,
-       AVG(enrollment_count) AS mean_enrollment,
-       percentile_approx(enrollment_count, 0.5) AS median_enrollment
-FROM mvp_eng_dados.mvp_cancer.slv_studies
-GROUP BY COALESCE(phase, 'SEM_INFORMACAO'), study_type, enrollment_type;
-```
-
-### 9.5 Patrocinadores principais
-
-```sql
-SELECT d.sponsor_name, d.sponsor_class,
-       COUNT(DISTINCT f.study_key) AS studies
-FROM mvp_eng_dados.mvp_cancer.gld_fat_clinical_study f
-JOIN mvp_eng_dados.mvp_cancer.gld_dim_sponsor d
-  ON f.sponsor_key = d.sponsor_key
-GROUP BY d.sponsor_name, d.sponsor_class
-ORDER BY studies DESC LIMIT 20;
-```
-
-### 9.6 Participantes e duração, estratificados por fase
-
-```sql
-SELECT COALESCE(phase, 'SEM_INFORMACAO') AS phase,
-       study_type, COUNT(*) AS paired_studies,
-       AVG(enrollment_count) AS mean_enrollment,
-       AVG(duration_days) AS mean_duration,
-       CORR(enrollment_count, duration_days) AS correlation
-FROM mvp_eng_dados.mvp_cancer.slv_studies
-WHERE overall_status = 'COMPLETED'
-  AND enrollment_type = 'ACTUAL'
-  AND start_date_type = 'ACTUAL' AND completion_date_type = 'ACTUAL'
-  AND LENGTH(start_date_original) = 10
-  AND LENGTH(completion_date_original) = 10
-  AND enrollment_count IS NOT NULL AND duration_days IS NOT NULL
-GROUP BY COALESCE(phase, 'SEM_INFORMACAO'), study_type;
-```
-
-Correlação não prova causalidade; pode ser nula ou indefinida em grupos pequenos ou constantes. Fases são categorias, não uma escala numérica simples. Inspecionar outliers e comparar distribuições.
-
-### 9.7 Países sem mapeamento
-
-```sql
-SELECT country_name, COUNT(*) AS location_rows,
-       COUNT(DISTINCT nct_id) AS affected_studies
-FROM mvp_eng_dados.mvp_cancer.slv_locations_iso3
-WHERE country_iso3 IS NULL
-GROUP BY country_name ORDER BY location_rows DESC;
-```
-
-### 9.8 Datas da fato de população
-
-```sql
-SELECT COUNT(*) AS orphan_dates
-FROM mvp_eng_dados.mvp_cancer.gld_fat_country_population f
-LEFT JOIN mvp_eng_dados.mvp_cancer.gld_dim_date d
-  ON f.date_key = d.date_key
-WHERE d.date_key IS NULL;
-```
-
-### 9.9 Conferência de persistência por camada
-
-```sql
-SELECT 'brz_clinical_trials' AS table_name, COUNT(*) AS rows
-FROM mvp_eng_dados.mvp_cancer.brz_clinical_trials
-UNION ALL
-SELECT 'brz_population', COUNT(*)
-FROM mvp_eng_dados.mvp_cancer.brz_population
-UNION ALL
-SELECT 'slv_studies', COUNT(*)
-FROM mvp_eng_dados.mvp_cancer.slv_studies
-UNION ALL
-SELECT 'gld_fat_clinical_study', COUNT(*)
-FROM mvp_eng_dados.mvp_cancer.gld_fat_clinical_study;
-```
-
-<a id="referencias"></a>
-## 10. Referências e rastreabilidade
-
-### 10.1 Fontes
-
-- [Repositório do MVP](https://github.com/wellingtondmf/pos_puc_2026/tree/main/MVP_ENGENHARIA_DE_DADOS): referência do projeto fornecida pelo autor; esta revisão técnica usa os DBC anexados, sem afirmar equivalência com a versão atual do GitHub.
-- [Escopo original](https://github.com/wellingtondmf/pos_puc_2026/blob/main/MVP_ENGENHARIA_DE_DADOS/Escopo_MVP): perguntas preservadas da documentação anterior.
+- [Repositório do MVP](https://github.com/wellingtondmf/pos_puc_2026/tree/main/MVP_ENGENHARIA_DE_DADOS)
 - [ClinicalTrials.gov — API](https://clinicaltrials.gov/data-api/api).
 - [ClinicalTrials.gov — estrutura dos estudos e enumerações](https://clinicaltrials.gov/data-api/about-api/study-data-structure).
 - [Banco Mundial — Population, total](https://data.worldbank.org/indicator/SP.POP.TOTL).
 - [Banco Mundial — termos de uso dos datasets](https://www.worldbank.org/ext/en/legal/terms-conditions/datasets).
 - [Databricks — Unity Catalog volumes](https://docs.databricks.com/aws/en/volumes).
 
-**Atribuição:** The World Bank, World Development Indicators, Population, total (SP.POP.TOTL). O indicador foi tipado, filtrado e integrado a dados clínicos. A documentação anterior identificou CC BY 4.0 na página do indicador; conferir termos adicionais e atribuição dos provedores para publicação. As condições de reutilização do ClinicalTrials.gov e a licença escolhida para o código devem ser confirmadas pelo autor. Não se presume endosso das instituições ao projeto.
-
-### 10.2 Identificação dos anexos analisados
+### 9.2 Identificação dos anexos analisados
 
 Esta remessa contém novos resultados e não é idêntica à anterior. Os hashes abaixo identificam os arquivos exatos analisados, sem constituir prova de execução ou assinatura. Foram lidos os comandos, posições, saídas, timestamps, flags de truncamento e erros de todos os 11 notebooks.
 
-| Arquivo | SHA-256 |
-| --- | --- |
-| config.dbc | 9b5292fa55e0f56f8a4a9da5312b5fd67adbc53c15e88d1499f80189411e7e6d |
-| 01_etl_brz_clinical_trials_table.dbc | aaa5c8522f1975967a4e295d14b8ff3ce58eb33d4b6f18f63fe4243f5eff5191 |
-| 01_etl_brz_world_bank_open_data.dbc | 1f7765125d61c4a6f0c1eb8daae838c79eddf9c7f76103e6bf02477d58ed31d9 |
-| 02_etl_silver_studies.dbc | 4c90d916656765edb00ad3754ebf7347955481302afb4b113300a8b52d71fcf5 |
-| 02_etl_silver_conditions.dbc | 13deb98a1902fc80fd39ac32b0f61ea564cd576fdf193f444b2ad604dbb12c31 |
-| 02_etl_silver_interventions.dbc | 6863fe0964b8456bba8e0e2e5ac9bad34eb82cc5f9bc195a7ce013550ef8b562 |
-| 02_etl_silver_locations.dbc | 0ca004c26d16cc979e5c9f525c4350ccc68f3b3cae6b1d5823dde3ff33c54408 |
-| 02_etl_silver_population.dbc | e131ddb6b42d077b592d22d4a1e4c69d18b90e41790076e1676c6c81ed045471 |
-| 02_etl_silver_locations_iso3.dbc | 710993c309245718a6d7c94403e2ec1c71220271a1d4c8a9ca00b5f104ab397c |
-| 03_etl_gold.dbc | e8d30a81eee9b5eed83538781825fad6f1192fffde6b4648d227120546780485 |
-| 04_qualidade_dados.dbc | 0470741705c049492da7a4764efdbd27e2319b963992a9b059baab195990dc09 |
-
-### 10.3 Critérios de elaboração
-
-Os números de perfil, regras, status, fases e contagens Gold foram extraídos das saídas dos notebooks. Os rankings geográficos e a cobertura populacional foram calculados localmente usando somente a flat exportada completa. A análise por tipo de intervenção foi mantida como histórica por sua data de execução. Nenhuma prévia truncada foi tratada como base integral.
-
-O documento mantém a organização acadêmica adotada no MVP — contexto, carga, modelagem, pipeline, qualidade, análise e autoavaliação. O enunciado original completo não foi reenviado nesta remessa; eventuais requisitos formais adicionais devem ser conferidos pelo autor. As limitações explicitadas permitem apresentar o alcance real do trabalho sem transformar ausência de evidência em resultado presumido.
+| Arquivo |
+| --- |
+| config.dbc |
+| 01_etl_brz_clinical_trials_table.dbc |
+| 01_etl_brz_world_bank_open_data.dbc | 
+| 02_etl_silver_studies.dbc |
+| 02_etl_silver_conditions.dbc |
+| 02_etl_silver_interventions.dbc | 
+| 02_etl_silver_locations.dbc |
+| 02_etl_silver_population.dbc |
+| 02_etl_silver_locations_iso3.dbc |
+| 03_etl_gold.dbc |
+| 04_qualidade_dados.dbc | 
+| 05_Analise_de_negocio.dbc |
