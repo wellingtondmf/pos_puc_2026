@@ -119,7 +119,7 @@ A carga reconstrói as tabelas com `overwrite`; não é uma ingestão incrementa
 > **Evidência — E01: Ambiente e armazenamento**  
 > Obs: catálogo, schema, objetos Bronze e volume, além da configuração do compute Serveless.  
 
-<![E01 — Ambiente e armazenamento](IMAGENS/E01_Ambiente e armazenamento.png) -->
+<![E01 — Ambiente e armazenamento](IMAGENS/E01_Ambiente_e_armazenamento.png) -->
 
 > **Evidência — E02: Conciliação clínica**  
 > Obs: páginas da coleta, total da API e quantidade persistida de 16.829.  
