@@ -1,4 +1,4 @@
-# MVP de Engenharia de Dados — Pesquisas clínicas sobre câncer de mama
+# MVP de Engenharia de Dados — Pesquisas clínicas sobre câncer
 
 **Autor:** Wellington Freitas  
 **Curso:** Pós-graduação PUC-Rio — Engenharia de Dados  
@@ -14,17 +14,17 @@ Um job foi criado e agendado com uma task por notebook de execução e dependên
 
 **Resumo técnico:**
 
- O MVP foi desenvolvido no Databricks em conjuto com o Gitlab, versionando todo o processo e separando as camadas para melhor abordagem e futura manutenção, utilizando Python, PySpark, SQL, com objetivo de analisar pesquisas clínicas sobre câncer de mama, que  foi o objeto de estudo no Sprint de Machine Learning e Analytics. Combinando dados do ClinicalTrials.gov com a população dos países disponibilizada pelo Banco Mundial.
+ O MVP foi desenvolvido no Databricks em conjuto com o Gitlab, versionando todo o processo e separando as camadas para melhor abordagem e futura manutenção, utilizando Python, PySpark, SQL, com objetivo de analisar pesquisas clínicas sobre câncer, que  foi o objeto de estudo no Sprint anterior de Machine Learning e Analytics. Combinando dados do ClinicalTrials.gov com a população dos países disponibilizada pelo Banco Mundial.
 
 - **Configuração compartilhada:** os notebooks importam o config usando %run ./config. Ele centraliza bibliotecas, catálogo/schema, sessão HTTP com retentativas, schemas JSON e funções reutilizáveis para datas, gravação e perfilamento.
 - **Camada Bronze** — ingestão: os ETLs consultam as APIs e preservam os registros em JSON, acompanhados de identificador da carga, URL e horário de coleta. A API clínica utiliza paginação e validação entre total recebido e persistido.
 - **Camada Silver** — tratamento: os JSONs são estruturados em tabelas de estudos, condições, intervenções, localizações e população. Aplicam-se normalização de textos, conversão de tipos e datas, deduplicação e mapeamento geográfico para ISO3.
 - **Camada Gold** — modelagem analítica: são criadas dimensões de estudos, patrocinadores, intervenções, países e datas; fatos de estudos e população; bridges para relacionamentos entre estudos, países e intervenções; e uma flat com indicadores por país e ano.
+- **Modelagem:** Na camada Gold,o modelo se encaixa melhor em modelagem dimensional com constelação de fatos. Essa classificação trás duas tabelas fato que compartilham dimensões, como gld_dim_date. É uma organização de múltiplos esquemas estrela conectados por dimensões compartilhadas.
 - **Qualidade e análise**: o pipeline calcula nulos, valores distintos e extremos, além de executar 15 regras de qualidade. As consultas analisam fases, situação dos estudos e distribuição geográfica.
 - **Automação:** um Job agendado executa uma task por notebook, respeitando as dependências Bronze → Silver → Gold. As tabelas são reconstruídas com overwrite e seguem agendados pela atualizacão da tabela anterior.
 
 O resultado atual reúne 16.829 estudos em uma estrutura de 20 tabelas, com documentação técnica, resultados e limitações identificadas.
-
 
 ### Sumário
 
@@ -50,14 +50,14 @@ O resultado atual reúne 16.829 estudos em uma estrutura de 20 tabelas, com docu
 | Integridade estudo | Zero cartesiano entre fato clínica e dimensão de estudos |
 | Qualidade | 13 de 15 regras aprovadas; 2.511 localizações sem ISO3 e 32 status fora da lista local |
 | Perfilamento | 45 combinações de tabela e coluna nas seis tabelas Silver |
-| Orquestração | Execução via Agendamento em job|
+| Orquestração | Execução via Agendamento em job databricks|
 
 <a id="contexto"></a>
 ## 1. Contexto de negócio e perguntas
 
 ### Problema e objetivo
 
-Os cadastros de pesquisas clínicas sobre câncer de mama contêm múltiplas condições, intervenções, locais, fases, patrocinadores e datas. A estrutura JSON da origem precisa ser organizada para permitir consultas consistentes e comparações entre países e períodos.
+Os cadastros de pesquisas clínicas sobre câncer contêm múltiplas condições, intervenções, locais, fases, patrocinadores e datas. A estrutura JSON da origem precisa ser organizada para permitir consultas consistentes e comparações entre países e períodos.
 
 O objetivo é construir uma plataforma analítica no Databricks para coletar, organizar e analisar esses dados públicos. Os objetivos específicos são preservar o conteúdo recebido, estruturar os atributos relevantes, construir um modelo dimensional, medir qualidade, automatizar a execução e responder às perguntas de negócio.
 
@@ -66,17 +66,15 @@ Contagem de estudos representa atividade de pesquisa no cadastro consultado. Nã
 ### Perguntas originais
 
 1. Quantos estudos sobre câncer de mama foram registrados por ano?
-2. Como os estudos estão distribuídos por país?
-3. Quais países concentram a maior quantidade de pesquisas?
-4. Quais são as fases clínicas mais frequentes?
-5. Quais tipos de intervenção são mais estudados?
-6. Quais tratamentos ou medicamentos aparecem com maior frequência?
-7. Como os estudos estão distribuídos por situação: recrutando, concluído, suspenso ou encerrado?
-8. Qual é a duração média dos estudos?
-9. Qual é o número médio de participantes por fase clínica?
-10. Quais organizações patrocinam mais estudos?
-11. Existe relação entre fase clínica, quantidade de participantes e duração do estudo?
-12. Como a participação do Brasil se compara à de outros países?
+2. Quais países concentram a maior quantidade de pesquisas?
+3. Quais são as fases clínicas mais frequentes?
+4. Quais tipos de intervenção são mais estudados?
+5. Quais tratamentos ou medicamentos aparecem com maior frequência?
+6. Como os estudos estão distribuídos por situação: recrutando, concluído, suspenso ou encerrado?
+7. Qual é o número médio de participantes por fase clínica?
+8. Quais organizações patrocinam mais estudos?
+9. Existe relação entre fase clínica, quantidade de participantes e duração do estudo?
+10. Como a participação do Brasil se compara à de outros países?
 
 ### Delimitação
 
@@ -98,7 +96,7 @@ A busca utiliza `query.cond=Breast Cancer`, sem filtro explícito de período ou
 | Bibliotecas | requests, urllib3, json, uuid, datetime, functools e APIs PySpark |
 | Persistência | Delta com `saveAsTable`, escrita `overwrite` |
 
-As camadas compartilham catálogo e schema; os prefixos identificam sua função. `VOLUME` é uma constante no config, mas os notebooks enviados gravam as tabelas pelo nome no Unity Catalog. Não há gravação explícita de arquivos em `/Volumes/` nessa implementação. Tabelas registradas e volumes são objetos distintos; a documentação Databricks informa que arquivos de volumes não podem ser registrados como tabelas no Unity Catalog. Um volume pode armazenar arquivos de entrada, enquanto as tabelas Delta permanecem no armazenamento da AWS da propria conta do databricks Academy.
+As camadas compartilham catálogo e schema; os prefixos identificam sua função. `VOLUME` é uma constante no config. Tabelas registradas e volumes são objetos distintos; Um volume pode armazenar arquivos de entrada, enquanto as tabelas Delta permanecem no armazenamento da AWS da propria conta do databricks Academy.
 
 ### 2.2 Bronze clínica
 
@@ -116,7 +114,7 @@ O coletor solicita `format=json`, `date=2000:2025` e `per_page=20000`. Separa os
 
 A carga reconstrói as tabelas com `overwrite`; não é uma ingestão incremental ou um MERGE. O código conserva o payload individual recebido, mas não preserva automaticamente todos os snapshots de API nem a resposta HTTP integral byte a byte. A coleta em lista Python usa memória do driver e não tem checkpoint por página. Para futura melhoria, será criada tabelas históricas especificas.
 
-`INGESTION_ID` e `COLLECTED_AT` são gerados quando config é executado. As tabelas de controle são sobrescritas e não têm um identificador comum do pipeline. Registrar Run ID e versões das tabelas ajuda a relacionar as evidências de uma mesma rodada. Não foi fornecida política de retenção Delta nem versão do Runtime e bibliotecas; esses dados devem constar do print de ambiente.
+`INGESTION_ID` e `COLLECTED_AT` são gerados quando config é executado. As tabelas de controle são sobrescritas e não têm um identificador comum do pipeline. O registro do Run ID e versões das tabelas ajuda foram evidenciados no decorrer da documentação. 
 
 > **Evidência — E01: Ambiente e armazenamento**  
 > Obs: catálogo, schema, objetos Bronze e volume, além da configuração do compute Serveless.  
@@ -203,7 +201,7 @@ erDiagram
 
 **Classe:** Silver. **Granularidade:** Par distinto nct_id e condição.
 
-- Explode o array de condições, normaliza espaços e remove nomes nulos e duplicatas. Permite investigar o escopo clínico e a presença de múltiplas doenças no mesmo estudo. Não possui tabela derivada Gold no código.
+- Explode o array de condições, normaliza espaços e remove nomes nulos e duplicatas. Permite investigar o escopo clínico e a presença de múltiplas doenças no mesmo estudo. 
 
 #### slv_interventions
 
@@ -257,7 +255,7 @@ erDiagram
 
 **Classe:** Dimensão. **Granularidade:** Uma data civil por date_key.
 
-- Gera calendário diário entre menor e maior data clínica, com ano, trimestre, mês, dia e semana. date_key tem formato yyyyMMdd. Relaciona-se à fato clínica em dois papéis: início e conclusão. A fato populacional usa 1º de janeiro; sua cobertura deve ser validada separadamente.
+- Gera calendário diário entre menor e maior data clínica, com ano, trimestre, mês, dia e semana. date_key tem formato yyyyMMdd. Relaciona-se à fato clínica em dois papéis: início e conclusão. A fato populacional usa 1º de janeiro; 
 
 #### gld_fat_clinical_study
 
@@ -269,7 +267,7 @@ erDiagram
 
 **Classe:** Fato. **Granularidade:** Uma entidade geográfica por ano.
 
-- Armazena population, country_key e date_key no formato ano0101. O dia 1º de janeiro é uma convenção da chave anual, não uma afirmação sobre a data da medição. População não deve ser somada entre anos para produzir um estoque populacional; agregados sobrepostos também não podem ser somados como países independentes.
+- Armazena population, country_key e date_key no formato ano0101. O dia 1º de janeiro é uma convenção da chave anual, não uma afirmação sobre a data da medição. 
 
 #### gld_flat_bridge_study_location
 
@@ -300,10 +298,6 @@ erDiagram
 **Classe:** Controle. **Granularidade:** Uma regra na avaliação armazenada.
 
 - Persiste nome, tabela, severidade, quantidade de falhas, passed e timestamp. passed significa contagem igual a zero. A rotina registra resultados e não lança uma falha automática quando uma regra ERROR reprova.
-
-### Cuidados com joins e agregações
-
-- Depois de um join da fato com uma bridge, um estudo pode ocupar várias linhas. Para contar estudos por categoria, usar `COUNT(DISTINCT study_key)`. Não somar participantes após joins geográficos ou de intervenção sem definir uma regra de alocação. Somar estudos por país não produz o total mundial, pois estudos multinacionais participam de vários grupos. Não tirar média simples das taxas por milhão de diferentes países/anos para obter uma taxa global.
 
 ### 3.4 Dicionário de dados completo
 
@@ -587,17 +581,32 @@ O catálogo textual documenta as 20 tabelas. Mostro abaixo a insert de comentár
 
 ### 4.1 Descrição individual
 
+| Arquivo |
+| --- |
+| config.dbc |
+| 01_etl_brz_clinical_trials_table.dbc |
+| 01_etl_brz_world_bank_open_data.dbc | 
+| 02_etl_silver_studies.dbc |
+| 02_etl_silver_conditions.dbc |
+| 02_etl_silver_interventions.dbc | 
+| 02_etl_silver_locations.dbc |
+| 02_etl_silver_population.dbc |
+| 02_etl_silver_locations_iso3.dbc |
+| 03_etl_gold.dbc |
+| 04_qualidade_dados.dbc | 
+| 05_Analise_de_negocio.dbc |
+
 #### 4.1.1 `config.dbc`
 
-Centraliza imports, constantes, sessão HTTP, schema clínico e funções auxiliares. Como o `profile_table` que calcula métricas por coluna; `create_http_session` configura retry; `parse_partial_date` preenche mês/dia ausentes com 01; `save_gold` padroniza Delta overwrite para camada gold. Lê a Bronze, escolhe a linha mais recente por nct_id/collected_at e aplica from_json. A definição do schema precede o parsing na ordem real `position`. Como esse notebook lê Bronze, uma primeira carga em ambiente vazio exige separar inicialização de transformação. Um empate de collected_at não tem desempate explícito.
+Centraliza imports, constantes, sessão HTTP, schema clínico e funções auxiliares. Como o `profile_table` que calcula métricas por coluna; `create_http_session` configura retry; `parse_partial_date` preenche mês/dia ausentes com 01; `save_gold` padroniza Delta overwrite para camada gold. Lê a Bronze, escolhe a linha mais recente por nct_id/collected_at e aplica from_json. A definição do schema precede o parsing na ordem real `position`. Com isso as configuraçoes pré definidas para cada notebook fica reutilizável.
 
 #### 4.1.2 `01_etl_brz_clinical_trials_table.dbc`
 
-Chama config, parametriza a busca clínica, pagina a API, serializa estudos, constrói schema e DataFrame, sobrescreve a Bronze e executa asserts de contagem. A coleta atual registra 17 páginas e 16.829 estudos. O SELECT final é uma prévia truncada e não deve ser contado para inferir o tamanho da tabela.
+Chama config, parametriza a busca clínica, pagina a API, serializa estudos, constrói schema e DataFrame, sobrescreve a Bronze e executa asserts de contagem. A coleta atual registra 17 páginas e 16.829 estudos.
 
 #### 4.1.3 `01_etl_brz_world_bank_open_data.dbc`
 
-Chama config, consulta o indicador populacional e armazena metadata e records. Monta 6.890 linhas e grava a Bronze. O SELECT final é truncado. Falta validar o total de páginas; country_id repete ISO3. A consulta DESCRIBE da tabela clínica, presente na versão anterior, foi removida desta versão.
+Chama config, consulta o indicador populacional e armazena metadata e records. Monta 6.890 linhas e grava a Bronze. O SELECT final é truncado. 
 
 #### 4.1.4 `02_etl_silver_studies.dbc`
 
@@ -605,7 +614,7 @@ Usa clinical_parsed para selecionar atributos do estudo, normalizar textos, conc
 
 #### 4.1.5 `02_etl_silver_conditions.dbc`
 
-Explode conditionsModule.conditions, normaliza espaços, filtra nulos e remove linhas duplicadas. Persiste slv_conditions. A saída contém 43.512 linhas no perfil e 16.828 estudos distintos: um estudo da base não possui linha final de condição. A causa específica não foi inspecionada.
+Explode conditionsModule.conditions, normaliza espaços, filtra nulos e remove linhas duplicadas. Persiste slv_conditions. A saída contém 43.512 linhas no perfil e 16.828 estudos distintos.
 
 #### 4.1.6 `02_etl_silver_interventions.dbc`
 
@@ -613,7 +622,7 @@ Explode armsInterventionsModule.interventions, normaliza tipo e nome e mantém d
 
 #### 4.1.7 `02_etl_silver_locations.dbc`
 
-Explode contactsLocationsModule.locations, seleciona estabelecimento e atributos geográficos, filtra país nulo e deduplica. Persiste slv_locations. O perfil mostra 203.002 linhas e 15.435 estudos distintos. Não cria um cadastro mestre de estabelecimentos.
+Explode contactsLocationsModule.locations, seleciona estabelecimento e atributos geográficos, filtra país nulo e deduplica. Persiste slv_locations. O perfil mostra 203.002 linhas e 15.435 estudos distintos.
 
 #### 4.1.8 `02_etl_silver_population.dbc`
 
@@ -631,9 +640,15 @@ Lê estudos, intervenções, locais mapeados e população. Constrói e persiste
 
 Lista as tabelas do projeto, chama config, perfila as seis Silver e grava sys_data_quality_control. Define 15 regras SQL, executa consultas, grava sys_data_quality_results e mostra status, fases e tipos de intervenção. Esta versão adiciona SELECTs das dez tabelas Gold. A célula inicial com apenas nomes qualificados está marcada como %sql e não contém uma instrução SQL válida; está sem execução nos metadados. Converter essa lista em Markdown antes de um Run all. O notebook não bloqueia automaticamente a publicação quando uma regra reprova.
 
+#### 4.1.12 `05_Analise_de_negocios.dbc`
+
+Usado para validar as perguntas a partir de consulta sql.
+
 ### 4.2 Job e ordem de execução
 
 **Persistência:** foi criado e agendado um Job com uma task por notebook de execução. Tanto a execução manual quanto execução via cluster Job foram concluídas com sucesso. As dependências são organizadas por camada, Bronze → Silver → Gold.
+
+Obs: O processo final da Camada Gold, foi mantido em um unico notebook para simular um framework de camada. (Apenas para diferenciar)
 
 O encadeamento lógico deve garantir também que `slv_locations` e `slv_population` estejam atualizadas antes de `slv_locations_iso3`. 
 
@@ -650,7 +665,7 @@ O encadeamento lógico deve garantir também que `slv_locations` e `slv_populati
 
 ### 4.3 Reprodutibilidade
 
-`%run ./config` Importa os notebooks preservando a relação de caminhos, confirmar bibliotecas e objetos de destino; executar as coletas, as Silver na ordem lógica, Gold e qualidade. Para reprodução em ambiente vazio, separar do config a leitura da Bronze. Registrar contagens, Run ID, horários e versões das tabelas. Como as fontes mudam, uma nova coleta pode produzir números diferentes dos apresentados.
+`%run ./config` Importa os notebooks preservando a relação de caminhos, confirmar bibliotecas, funções e dados reutilizaveis para outros notebook e objetos de destino; executar as coletas, Silver na ordem lógica, Gold em sequecia e qualidade.Registra contagens, Run ID, horários e versões das tabelas. Como as fontes são reexecutadas, uma nova coleta pode produzir números diferentes dos apresentados.
 
 > **Evidência — E05: Grafo do Job**  
 > Obs: tasks e dependências entre camadas. 
@@ -682,10 +697,11 @@ O encadeamento lógico deve garantir também que `slv_locations` e `slv_populati
 | gld_flat_bridge_study_location | 24.918 |
 | gld_flat_country_year_metrics | 1.871 |
 
-As saídas de contagem e as duas validações da Gold possuem metadados de 21/09/2026. A fato contém 16.829 linhas e 16.829 chaves distintas; o join com gld_dim_study apresenta zero Cartesiano. Esses números substituem os 16.736 estudos da documentação anterior.
+As saídas de contagem e as duas validações da Gold possuem metadados de 21/09/2026. A fato contém 16.829 linhas e 16.829 chaves distintas; o join com gld_dim_study apresenta zero Cartesiano.
 
 > **Evidência — E08: Persistência e validação Gold**  
-> Obs: as dez contagens, unicidade da fato e ausência de órfãos na relação estudo.  
+> Obs: as dez contagens, unicidade da fato e com chave primaira e extrageira validada na relação estudo.  
+
 <![E08 — Persistência e validação Gold](IMAGENS/E08_Persistência_validação_Gold.png) -->
 
 <a id="qualidade"></a>
@@ -717,7 +733,7 @@ O perfilamento calcula total, não nulos, nulos, percentual de nulos, distintos 
 
 - Os 32 casos correspondem a NO_LONGER_AVAILABLE (13), APPROVED_FOR_MARKETING (10), AVAILABLE (8) e TEMPORARILY_NOT_AVAILABLE (1). A enumeração oficial da fonte reconhece essas situações; a regra local não as contempla.
 
-- As 2.511 localizações sem ISO3 representam 1,2369% de 203.002 linhas; não são 2.511 países nem estudos. São mantidas na Silver e descartadas da bridge geográfica. Deve-se medir quantos estudos perdem representação por causa disso.
+- As 2.511 localizações sem ISO3 representam 1,2369% de 203.002 linhas; não são 2.511 países nem estudos. São mantidas na Silver e descartadas da bridge geográfica.
 
 ### 5.2 Perfil completo das colunas Silver
 
@@ -773,16 +789,15 @@ O quadro foi reconstruído diretamente das 45 linhas da saída atual. Extremos d
 
 ### 5.3 Interpretação e limitações
 
-Há 3.705 estudos com fase nula, 239 com participantes nulos e 607 com duração nula. A maior quantidade de participantes é 15.000.000; a duração máxima é 35.582 dias, e a conclusão máxima convertida é 2100-12-01. Esses extremos exigem inspeção do cadastro antes de qualquer exclusão. Datas com precisão apenas anual ou mensal recebem dia/mês 01 para conversão; isso introduz precisão artificial na duração.
+Há 3.705 estudos com fase nula, 239 com participantes nulos e 607 com duração nula. A maior quantidade de participantes é 15.000; a duração máxima é 35.582 dias, e a conclusão máxima convertida é 2100-12-01. Esses extremos exigem inspeção do cadastro antes de qualquer exclusão. Datas com precisão apenas anual ou mensal recebem dia/mês 01 para conversão; isso introduz precisão artificial na duração.
 
-O perfil é posterior aos filtros. Ele não quantifica individualmente as linhas eliminadas na Bronze → Silver. Zero falhas em população nula não prova completude na origem, pois a Silver já exclui nulos. Valores zero de população passam na regra atual e exigem proteção antes de uma divisão. Strings vazias não são nulos.
+O perfil é posterior aos filtros. Ele não quantifica individualmente as linhas eliminadas na Bronze → Silver. Valores zero de população passam na regra atual e exigem proteção antes de uma divisão. Strings vazias não são nulos.
 
-Os resultados completos da flat país–ano têm 291 linhas sem população e 28 linhas com ano nulo, calculados nesta revisão. Anos fora de 2000–2025, ausência de código na população e ano de início nulo podem impedir o denominador; 
+Os resultados completos da flat país–ano têm 291 linhas sem população e 28 linhas com ano nulo.
 
 ### 5.4 Rastreabilidade temporal das exportações
 
-O perfil populacional registra collected_at = `2026-09-21 10:04:32.845896`. O perfil clínico registra `2026-09-21 10:11:41.069693`, embora algumas células de leitura manual tenham timestamps anteriores. Esse desencontro pode decorrer de execuções sobrepostas ou saídas de rodadas diferentes; a causa não foi determinada. Não usar esses timestamps como prova de uma única sequência de carga sem Run ID e versões das tabelas.
-
+O perfil populacional registra collected_at = `2026-09-21 10:04:32.845896`. O perfil clínico registra `2026-09-21 10:11:41.069693`, embora algumas células de leitura manual tenham timestamps anteriores.
 
 > **Evidência — E09: Perfil Silver**  
 > Obs: Função criada para qualificar e quantificar métricas como Null e erregularidades.  
@@ -790,12 +805,16 @@ O perfil populacional registra collected_at = `2026-09-21 10:04:32.845896`. O pe
 
 Obs: nulos, distintos e extremos com contexto de execução.  
 
+
+**Evidência — E09: Perfil Silver** Faz a chamada das tabelas silvers em loop para qualificá-las. Gravando por fim, em uma tabela delta controle de qualidade.
+
 <![E09 — Perfil Silver](IMAGENS/E09_Perfil_Silver_2.png) -->
 
 > **Evidência — E10: Regras de qualidade**  
 > Obs: 15 regras e resumo atualizado feita em lista de dicionários.
 
 <![E10 — Regras de qualidade](IMAGENS/E10_Regras_de_qualidade.png) -->
+
 
 > **Evidência — E11: Análise das ocorrências de qualidade**  
 > Obs: países sem ISO3, domínio corrigido de status e inspeção de outliers. O processo de qualidade executa a lista de dicionarios e inclui a validação de cada regra em um dataframe, que posteriormente será salvo em uma tabela delta.
@@ -808,22 +827,22 @@ Obs: nulos, distintos e extremos com contexto de execução.
 
 ### 6.1 Alcance das respostas
 
-As consultas permitem analisar fases e status das perguntas proposta neste MVP. O resultado por tipo de intervenção permanece histórico completo direto da origem. A flat país–ano foi exportada integralmente (1.871 linhas, sem overflow), permitindo agregações geográficas nesta revisão. Os SELECTs de estudos, fato clínica e bridges estão truncados.
+As consultas permitem analisar fases e status das perguntas proposta neste MVP. O resultado por tipo de intervenção permanece histórico completo direto da origem. A flat país–ano foi exportada integralmente (1.871 linhas, sem overflow), permitindo agregações geográficas.
 
 | Pergunta | Situação | Motivo / alcance |
 | --- | --- | --- |
 | 1 — Registro por ano | Respondida | A quantidade de registro por ano aumenta a cada ano. Precisa de melhoria na tabela para camada gold |
-| 2 — Ranking de países | Respondida para geografia mapeada | Mesma cobertura e limitação da pergunta 2 |
-| 3 — Fases | Resultado disponível com ressalva | COALESCE combina nulo e NA |
-| 4 — Tipos de intervenção | Resultado histórico | Célula de agosto não foi atualizada na exportação |
-| 5 — Tratamentos / medicamentos | Sem resposta final | Bridge e dimensão de intervenções truncadas no export; falta consulta agregada completa |
-| 6 — Situação | Respondida | Resultado agregado atualizado |
-| 7 — Participantes por fase | Sem resposta final | Falta agregado completo; separar ACTUAL/ESTIMATED |
-| 8 — Patrocinadores | Sem resposta final | Dimensão completa não informa frequência; fato/estudos estão truncados |
+| 2 — Ranking de países | Respondida | Entender quais paises consentramm o maior numero de estudo |
+| 3 — Fases | Respondida| Sabendo quais são as fases mais frenquentes, podemos entender até onde os estudos alcançam |
+| 4 — Tipos de intervenção | Respondida | Quais são os tipos de intervençoes mais comuns |
+| 5 — Tratamentos / medicamentos | Não conclusivo | Tentar chegar em um denominador comumm para melhor tratamentos, mas sem resultado conclusivo |
+| 6 — Situação | Não conclusivo | Status COMPLETED Significa conclusão do estudo, não eficácia ou sucesso terapêutico |
+| 7 — Participantes por fase | Sem resposta final | Entender as fases com mais participante. Porem a muitas fases sem classificação |
+| 8 — Patrocinadores | Respondida | Analisar quais setores investem mais em estudos, e logicamente são industrias |
 | 9 — Fase, participantes e duração | Sem resposta final | Falta análise estratificada e tratamento dos extremos |
-| 10 — Brasil | Comparação descritiva parcial | Ranking e indicador de 2025 da flat; sem conclusão causal ou de acesso |
+| 10 — Brasil | Respondida | Entender a participação do Brasil em meio a outros paises. |
 
-### 6.1.1 Quantidade de registro de estudos feito por ano — Perguntas 1
+### 6.1 Quantidade de registro de estudos feito por ano — Perguntas 1
 
 **Analise sobre a pergunta:**A ideia desta pergunta foi encontrar se a quantidade de registro de estudos por ano, se mantem ao longo dos anos ou não. Para usar esse parametro futuramente, e entender se mais ou menos estudos ajudam a melhorar a qualidade da solução na luta contra o cancer.
 
@@ -849,7 +868,7 @@ SELECT YEAR(data_primeira_publicacao) AS ano_registro,
 <![Q01 — Quantidade de estudos por ano](IMAGENS/Q01_Quantidade_estudos_ano.png) -->
 
 ---
-### 6.1.2 Países com mais estudos  — Perguntas 2
+### 6.2 Países com mais estudos  — Perguntas 2
 
 **Analise sobre a pergunta:** Soma de study_count por país em todos os grupos da flat exportada sem data filtro apenas um valor total, incluindo o grupo de ano nulo. Pela granularidade do modelo, cada estudo tem um único ano de início e um par estudo–país na bridge; portanto a soma entre anos representa a contagem por país, condicionada à unicidade prevista no código. Não é soma mundial de estudos exclusivos
 
@@ -874,11 +893,12 @@ SELECT DENSE_RANK() OVER (ORDER BY quantidade_estudos DESC) AS posicao,
 
 ![Q02 — Ranking dos Paises](IMAGENS/Q02_Ranking_dos_paises.png) -->
 
-Os Estados Unidos concentram 7.047 estudos com geografia mapeada, seguidos de China (2.203) e França (1.384). O ranking descreve presença de locais dos estudos nesses países, não nacionalidade do patrocinador nem pacientes únicos. A cobertura incompleta do ISO3 limita a comparação.
+
+Os Estados Unidos concentram 7.047 estudos com geografia mapeada, seguidos de China (2.203) e França (1.384). O ranking descreve presença de locais dos estudos nesses países, não nacionalidade do patrocinador nem pacientes únicos.
 
 ---
 
-### 6.1.3 Fases clínicas — Pergunta 3
+### 6.3 Fases clínicas — Pergunta 3
 **Analise sobre a pergunta:** O grupo NA reúne 8.635 estudos e mistura valores NA explícitos com 3.705 fases nulas. A diferença de 4.930 é uma conciliação entre saídas, condicionada à mesma versão da base. Entre fases nomeadas isoladas, PHASE2 é a mais frequente, com 3.555. As categorias combinadas foram preservadas,e não devem ser distribuídas entre fases sem definir uma regra.
 
 ```
@@ -900,7 +920,7 @@ SELECT fase,
 ![Q03 — Fases](IMAGENS/Q03_Fases.png) -->
 
 ---
-### 6.1.4 Tipos de intervenção — Pergunta 4
+### 6.4 Tipos de intervenção — Pergunta 4
 
 **Analise sobre a pergunta:** DRUG lidera essa saída histórica, com 7.699 estudos. Um estudo pode aparecer em vários tipos, e a soma das categorias não equivale ao total de estudos. Para a base atual, o perfil atual registra 15.348 estudos distintos em slv_interventions, mas não fornece sua distribuição completa por tipo.
 
@@ -916,7 +936,7 @@ SELECT intervention_type AS tipo_intervencao,
 > Obs: Consulta agregada reexecutada para a mesma rodada da entrega.  
 ![Q04 — Tipos de intervenção](IMAGENS/Q04_Tipos_de_intervencao.png) -->
 
-### 6.1.5 Tratamentos e medicamentos — Pergunta 5
+### 6.5 Tratamentos e medicamentos — Pergunta 5
 
 **Analise sobre a pergunta:** O medicamento mais utilizado segundo a analise e a base é o Paclitaxel. Send um medicamento quimioterápico usado no tratamento de vários tipos de câncer, é possivel que talvez seja um dos mais eficazes. Mas ainda falta bases mais detalhadas.
 
@@ -938,7 +958,7 @@ ORDER BY quantidade_estudos DESC, intervencao
 ![Q05 — Tratamentos e medicamentos](IMAGENS/Q05_Tratamentos_medicamentos.png) -->
 
 ---
-### 6.1.6 Situação — Pergunta 6
+### 6.6 Situação — Pergunta 6
 
 **Analise sobre a pergunta:** COMPLETED representa 45,76% (7.701 estudos); RECRUITING reúne 2.448 (14,55%). UNKNOWN representa 14,80% (2.491), limitando a interpretação da atividade operacional. COMPLETED significa conclusão do estudo, não eficácia ou sucesso terapêutico. A soma dos percentuais pode diferir de 100% por arredondamento.
 
@@ -957,7 +977,7 @@ SELECT overall_status AS situacao,
 ![Q06 — Situação](IMAGENS/Q06_Situacao.png) -->
 
 ---
-### 6.1.7 Participantes por fases — pergunta 7
+### 6.7 Participantes por fases — pergunta 7
 
 **Analise sobre a pergunta:** A média dos Participantes por fases ignora valores nulos. Por isso, estudos_com_participantes informa o denominador efetivo.
 
@@ -985,7 +1005,7 @@ ORDER BY fase, tipo_estudo, tipo_contagem;
 
 ---
 
-### 6.1.8 Patrocinadores — pergunta 8
+### 6.8 Patrocinadores — pergunta 8
 
 **Analise sobre a pergunta:** A classe dos patrocinadores aparentimente é predominante industrial, sendo dificil analisar outros setores incluino governamentais. Esse fato não parece ser incomum devido ao ser o maiores interessados em si. 
 
@@ -1010,7 +1030,7 @@ SELECT d.sponsor_name AS patrocinador,
 
 ---
 
-### 6.1.9 Fase, participantes e duração — pergunta 9
+### 6.9 Fase, participantes e duração — pergunta 9
 
 **Analise sobre a pergunta:** Correlação próxima de 1 indica associação positiva; próxima de −1, negativa; próxima de 0, pouca associação linear. Grupos constantes podem produzir correlação indefinida. O mínimo de três registros apenas evita grupos muito pequenos; não garante robustez estatística. A consulta é exploratória e não demonstra causalidade.
 
@@ -1048,7 +1068,7 @@ HAVING COUNT(*) >= 3
 ![Q09 — Fase, participantes e duração](IMAGENS/Q09_Fase_participantes_duracao.png) -->
 ---
 
-### 6.1.10 Brasil — Pergunta 10
+### 6.10 Brasil — Pergunta 10
 
 **Analise sobre a pergunta:** o Brasil aparece com 385 estudos na soma dos grupos da flat, em 14º lugar por contagem entre os códigos representados na tabela. Essa é uma comparação descritiva da cobertura mapeada. Para o ano de início de 2025, a flat contém 26 estudos associados ao Brasil e população de 212.812.405, produzindo 0,1222 estudo por milhão. O valor de facility_count é 164 e representa a soma das participações de pares estabelecimento/cidade nos estudos desse grupo. Não representa 164 hospitais únicos nem número de participantes.
 
@@ -1092,75 +1112,23 @@ ORDER BY ranking_quantidade, pais;
 
 ### 7.1 Alcance dos objetivos
 
-A implementação integra duas fontes públicas e organiza os dados em camadas com funções definidas. A Bronze preserva o payload, a Silver estrutura os atributos, e a Gold disponibiliza um modelo dimensional com relacionamentos de muitos para muitos e indicadores populacionais. Foram documentadas as 20 tabelas e suas colunas, os 11 notebooks e os controles de qualidade.
+Considero que alcancei o objetivo técnico principal do MVP: construir um pipeline de dados em nuvem utilizando a plataforma de dados da Databricks, em conjunto com o GitHub para apoiar a análise de pesquisas clínicas sobre câncer. Integrando dados do ClinicalTrials.gov e do Banco Mundial, organizando o processamento nas camadas Bronze, Silver e Gold e implementado a persistência em tabelas Delta. Também configurado a execução por Job, com dependências entre as etapas.
 
-O autor relata execução manual e via Job agendado concluídas. Os anexos demonstram contagens e persistência compatíveis com uma base atualizada de 16.829 estudos. A rastreabilidade de uma rodada única ainda depende dos prints e metadados operacionais, devido à mistura de resultados e mensagens preservadas nas exportações.
-
-O objetivo analítico foi atendido parcialmente: há respostas de situação e fase, resultado histórico de intervenções e comparações geográficas calculadas da flat completa. As demais perguntas têm os motivos de não conclusão e consultas de apoio documentados. A existência do pipeline não implica que todas as perguntas de negócio tenham sido respondidas.
+A modelagem dimensional, composta por fatos, dimensões, tabelas flats, permitiu analisar diferentes aspectos dos estudos. Obtive resultados sobre distribuição geográfica, fases clínicas, intervenções, patrocinadores e participação do Brasil. Entretanto, reconheçendo que o objetivo analítico foi atendido parcialmente em algummas questões, pois ainda existem respostas e interpretações que precisam ser consolidadas. A frequência de um tratamento nos registros, por exemplo, não permite concluir sobre sua eficácia.
 
 ### 7.2 Aprendizados técnicos observáveis
 
-O trabalho exercita ingestão REST paginada, serialização JSON, schemas explícitos, normalização de arrays, deduplicação, enriquecimento geográfico, modelagem dimensional, tabelas associativas e perfilamento. A revisão evidencia a importância de definir o grão antes de agregar, distinguir datas de início e registro e separar sucesso operacional de qualidade dos dados.
+Os principais desafios técnicos envolveram a transformação dos JSONs aninhados, o tratamento de datas incompletas e valores nulos, a padronização dos países e a representação de relacionamentos de muitos para muitos. Para contornar esse desafios, utilizei schemas explícitos, normalização de textos, deduplicação, conversão de datas e tabelas normalizadas exclusivas para joins. Algumas limitações, como localizações sem correspondência ISO3 e perda de precisão ao completar datas parciais ainda precisão ser melhoradas.
 
-### 7.3 Relato pessoal do autor
+O projeto reforçou a importância de distinguir execução bem-sucedida de qualidade dos dados. O perfilamento e as regras de validação ajudaram a identificar inconsistências e limitações que afetam as análises. Também compreendi a necessidade de definir a granularidade das tabelas e evitar duplicação de medidas ou plano cartesiano nas consultas.
 
-**COMPLETAR PELO AUTOR:** principal dificuldade, decisão tomada para resolvê-la e aprendizado pessoal. Esses itens não foram relatados de forma suficiente para redigir uma experiência em primeira pessoa sem inferência.
+### 7.3 Evoluções propostas
 
-### 7.4 Evoluções propostas
+Como trabalhos futuros, pretendo preservar o histórico das cargas e das avaliações de qualidade, ampliar as validações de integridade, melhorar o mapeamento geográfico e desenvolver um dashboard. Essas evoluções permitirão acompanhar mudanças nos estudos e ampliar o valor analítico do projeto em meu portfólio.
 
-Separar config de leitura de dados; preservar snapshots e histórico de qualidade; parametrizar período e ambiente; manter uma referência geográfica com prioridade explícita; ampliar integridade de dimensões e bridges; registrar perdas por transformação; criar alertas e, se desejado, bloqueio de publicação por severidade. Essas melhorias não são apresentadas como implementadas.
-
+---
 <a id="evidencias"></a>
-## 8. Evidências, pontos de revisão e limites da entrega
-
-
-### 8.2 O que não foi confirmado e por quê
-
-| Item | Motivo | Ação para completar |
-| --- | --- | --- |
-| Nome e agenda do Job, fuso e Run ID | Não constam dos DBC | Anexar configuração e prints E05–E07 |
-| Rodada única sem mensagens de erro | Exportações misturam estados e datas | Exportar após execução final e vincular ao Run ID |
-| Completude populacional | metadata não foi conciliado pelo código | Comparar páginas/total, Bronze e perdas na Silver |
-| Persistência de arquivos no volume | Código usa saveAsTable, sem escrita em /Volumes | Documentar destino real em E01 |
-| Criação inicial dos objetos | Notebook de preparação não foi anexado | Acrescentar notebook ou DDL usado |
-| Registro por ano | Schema clínico não extrai data de registro | Definir evento e estender transformação |
-| Demais agregados analíticos faltantes | SELECTs de detalhe truncados | Executar consultas completas da seção 9 |
-| Comentários e constraints no catálogo | Não demonstrados pelos anexos | Conferir Catalog Explorer e DDL |
-| Relato pessoal de autoavaliação | Não pode ser inferido do código | Completar a seção 7.3 |
-| Termos clínicos e licença do código | Não foram formalizados nos anexos | Confirmar termos de reutilização e licença escolhida |
-
-### 8.3 Ajustes técnicos identificados
-
-| Prioridade | Achado | Tratamento recomendado |
-| --- | --- | --- |
-| Alta | Célula inicial de qualidade contém nomes sob %sql | Transformar a lista em Markdown ou SQL válido |
-| Alta | config lê Bronze em todas as chamadas | Separar configuração e parsing para primeira carga |
-| Alta | Domínio de status incompleto | Incluir as categorias válidas da fonte e reavaliar |
-| Alta | ISO3 ausente em 2.511 locais | Revisar correspondências e medir estudos afetados |
-| Alta | População contém agregados | Definir países/territórios elegíveis por referência oficial |
-| Média | country_id repete country_iso3 | Corrigir origem ou explicitar contrato redundante |
-| Média | dropDuplicates/first sem prioridade em nomes | Definir desempate e prioridade de aliases |
-| Média | Fase nula convertida em NA na Gold | Preservar ausência separada de não aplicabilidade |
-| Média | Duração usa datas estimadas e imputadas | Definir população analítica e precisão |
-| Média | Taxa permite denominador zero no código | Aplicar regra explícita de denominador positivo |
-| Média | Perfil de tabela vazia sem proteção explícita | Tratar agregações vazias e divisão por zero |
-| Média | Controles e cargas sobrescritos | Registrar execução e histórico quando necessário |
-
-### 8.4 Checklist documental
-
-- [x] Objetivos e 12 perguntas preservados.
-- [x] Fontes, parâmetros, arquitetura e transformação descritos.
-- [x] 11 notebooks analisados na ordem lógica das células.
-- [x] 20 tabelas explicadas, incluindo grão, fatos, dimensões e flats.
-- [x] Dicionário das colunas incluído.
-- [x] Contagens e perfil atualizados com esta remessa.
-- [x] Job e sucesso manual/automatizado registrados conforme relato do autor.
-- [x] Resultados históricos e agregações locais identificados.
-- [ ] Inserir prints e metadados reais nos espaços marcados.
-- [ ] Reexecutar consultas históricas e completar análises faltantes.
-- [ ] Registrar correções ou justificativas dos pontos técnicos.
-- [ ] Completar autoavaliação pessoal e conferir requisitos formais da disciplina.
-- [ ] Publicar Markdown e imagens no repositório de entrega.
+## 8. Evidências, pontos de revisão.
 
 ### 8.5 Índice dos espaços de evidência
 | Código | Conteúdo | Caminho sugerido |
@@ -1196,23 +1164,4 @@ Separar config de leitura de dados; preservar snapshots e histórico de qualidad
 - [ClinicalTrials.gov — estrutura dos estudos e enumerações](https://clinicaltrials.gov/data-api/about-api/study-data-structure).
 - [Banco Mundial — Population, total](https://data.worldbank.org/indicator/SP.POP.TOTL).
 - [Banco Mundial — termos de uso dos datasets](https://www.worldbank.org/ext/en/legal/terms-conditions/datasets).
-- [Databricks — Unity Catalog volumes](https://docs.databricks.com/aws/en/volumes).
 
-### 9.2 Identificação dos anexos analisados
-
-Esta remessa contém novos resultados e não é idêntica à anterior. Os hashes abaixo identificam os arquivos exatos analisados, sem constituir prova de execução ou assinatura. Foram lidos os comandos, posições, saídas, timestamps, flags de truncamento e erros de todos os 11 notebooks.
-
-| Arquivo |
-| --- |
-| config.dbc |
-| 01_etl_brz_clinical_trials_table.dbc |
-| 01_etl_brz_world_bank_open_data.dbc | 
-| 02_etl_silver_studies.dbc |
-| 02_etl_silver_conditions.dbc |
-| 02_etl_silver_interventions.dbc | 
-| 02_etl_silver_locations.dbc |
-| 02_etl_silver_population.dbc |
-| 02_etl_silver_locations_iso3.dbc |
-| 03_etl_gold.dbc |
-| 04_qualidade_dados.dbc | 
-| 05_Analise_de_negocio.dbc |
