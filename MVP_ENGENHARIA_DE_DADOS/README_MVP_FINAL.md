@@ -2,7 +2,7 @@
 
 **Autor:** Wellington Freitas  
 **Curso:** Pós-graduação PUC-Rio — Engenharia de Dados  
-**Plataforma do projeto:** Databricks Free Edition, conforme contexto informado  
+**Plataforma do projeto:** Databricks Free Edition
 **Matricula:** 4052026000913  
 
 
